@@ -1,3 +1,4 @@
+import { handleAdminAuth } from "./admin-auth.js";
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
   "cache-control": "no-store"
@@ -344,6 +345,10 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     try {
+      // Admin authentication routes
+      if (url.pathname.startsWith("/api/admin/")) {
+        return await handleAdminAuth(request, env);
+      }
       if (url.pathname.startsWith("/api/")) {
         if (request.method === "OPTIONS") {
           return new Response(null, {
