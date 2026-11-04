@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Mock test | Exam Practice</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="topbar"><a class="brand" href="/">Exam Practice</a><select id="language" aria-label="Language"><option value="en">English</option><option value="zh-CN">简体中文</option><option value="zh-TW">繁體中文</option></select></header>
+<main class="container">
+  <a class="back-link" href="/">← All exams</a>
+  <section id="mock-root" class="quiz-card"><h1 id="mock-heading">Mock test</h1>
+<div id="mock-loading" class="loading-state" role="status" aria-live="polite">
+  <span class="loading-spinner"></span>
+  <span id="mock-status">Preparing your questions…</span>
+</div>
+<div id="mock-questions"></div><button class="primary" id="submit-mock" type="button" hidden>Submit test</button><div id="mock-result" class="feedback" hidden></div></section>
+</main>
+<script type="module" src="/js/mock.js"></script>
+</body>
+</html>

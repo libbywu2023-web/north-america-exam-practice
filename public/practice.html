@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Practice questions | Exam Practice</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+<header class="topbar"><a class="brand" href="/">Exam Practice</a><select id="language" aria-label="Language"><option value="en">English</option><option value="zh-CN">简体中文</option><option value="zh-TW">繁體中文</option></select></header>
+<main class="container">
+  <a class="back-link" href="/" id="back-link">← All exams</a>
+  <div class="progress-row"><span id="counter">Question</span><span id="topic"></span></div>
+  <div class="progress"><span id="progress-fill"></span></div>
+  <section class="quiz-card">
+    <h1 id="question">Loading question…</h1>
+    <form id="answer-form">
+      <fieldset id="options"><legend id="choose-label">Choose one answer</legend></fieldset>
+      <button class="primary" id="check-button" type="submit">Check answer</button>
+    </form>
+    <div id="feedback" class="feedback" hidden aria-live="polite"></div>
+    <div class="nav-row"><button class="secondary" id="previous" type="button">Previous</button><button class="primary" id="next" type="button" disabled>Next</button></div>
+  </section>
+  <p class="disclaimer" id="disclaimer">Independent practice resource. Not official ICBC questions.</p>
+</main>
+<script type="module" src="/js/practice.js"></script>
+</body>
+</html>
