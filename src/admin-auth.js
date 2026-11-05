@@ -113,6 +113,13 @@ async function verifySession(token, secret) {
     return false;
   }
 }
+export async function isAdminAuthenticated(request, env) {
+  if (!env.ADMIN_SESSION_SECRET) return false;
+
+  const token = getCookie(request, COOKIE_NAME);
+
+  return verifySession(token, env.ADMIN_SESSION_SECRET);
+}
 
 function cookieHeader(value, maxAge) {
   return [

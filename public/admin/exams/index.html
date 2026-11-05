@@ -1,0 +1,237 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Exams | Exam Practice CMS</title>
+  <link rel="stylesheet" href="/admin/css/admin.css">
+</head>
+<body class="dashboard-page">
+
+  <header class="admin-header">
+    <a class="admin-brand" href="/admin/dashboard/">
+      <span class="admin-logo">EP</span>
+      <span>Exam Practice CMS</span>
+    </a>
+
+    <div class="admin-header-right">
+      <span class="admin-user">Administrator</span>
+      <button id="logout-button" class="logout-button">Sign Out</button>
+    </div>
+  </header>
+
+  <div class="admin-layout">
+    <aside class="admin-sidebar">
+      <div class="sidebar-label">MAIN MENU</div>
+      <a class="sidebar-link" href="/admin/dashboard/">
+        <span>▦</span> Dashboard
+      </a>
+
+      <div class="sidebar-label">CONTENT MANAGEMENT</div>
+      <a class="sidebar-link" href="/admin/countries/">
+        <span>🌎</span> Countries
+      </a>
+      <a class="sidebar-link" href="/admin/regions/">
+        <span>📍</span> Regions
+      </a>
+      <a class="sidebar-link" href="/admin/categories/">
+        <span>📚</span> Exam Categories
+      </a>
+      <a class="sidebar-link active" href="/admin/exams/">
+        <span>📝</span> Exams
+      </a>
+      <div class="sidebar-link disabled">
+        <span>📂</span> Topics
+        <small>Coming soon</small>
+      </div>
+      <div class="sidebar-link disabled">
+        <span>❓</span> Questions
+        <small>Coming soon</small>
+      </div>
+      <div class="sidebar-link disabled">
+        <span>🌐</span> Languages
+        <small>Coming soon</small>
+      </div>
+    </aside>
+
+    <main class="admin-main">
+      <div class="page-heading">
+        <div>
+          <h1>Exams</h1>
+          <p>Manage exams across countries, regions and categories.</p>
+        </div>
+        <button id="add-exam-button" class="primary-button">
+          + Add Exam
+        </button>
+      </div>
+
+      <section class="dashboard-welcome">
+        <h2>Exam Management</h2>
+        <p>
+          Create and manage exam configurations, including localized
+          titles, exam settings and publication status.
+        </p>
+      </section>
+
+      <section class="module-card countries-toolbar">
+        <div>
+          <label for="exam-search">Search exams</label>
+          <input
+            type="search"
+            id="exam-search"
+            placeholder="Search exam name or slug..."
+          >
+        </div>
+        <div id="exam-count">Loading exams...</div>
+      </section>
+
+      <section class="module-card countries-table-card">
+        <div class="table-heading">
+          <h2>Exam List</h2>
+          <button id="refresh-exams-button" class="secondary-button">
+            Refresh
+          </button>
+        </div>
+
+        <div class="table-responsive">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Exam</th>
+                <th>Country / Region</th>
+                <th>Category</th>
+                <th>Status</th>
+                <th>Exam Questions</th>
+                <th>Bank Questions</th>
+                <th>Time</th>
+                <th>Pass Score</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="exams-table-body">
+              <tr>
+                <td colspan="10">Loading exams...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <p id="exams-message" class="form-message" role="status"></p>
+
+      <div id="exam-modal" class="admin-modal hidden">
+        <div class="admin-modal-content exam-modal-content">
+          <div class="modal-header">
+            <div>
+              <h2 id="exam-modal-title">Add Exam</h2>
+              <p class="muted-text">Configure exam details and translations.</p>
+            </div>
+            <button
+              type="button"
+              id="close-exam-modal"
+              class="modal-close"
+            >×</button>
+          </div>
+
+          <form id="exam-form">
+            <input type="hidden" id="exam-id">
+
+            <label for="exam-country">Country</label>
+            <select id="exam-country" required></select>
+
+            <label for="exam-region">Region</label>
+            <select id="exam-region" required></select>
+
+            <label for="exam-category">Exam Category</label>
+            <select id="exam-category" required></select>
+
+            <label for="exam-slug">URL Slug</label>
+            <input
+              id="exam-slug"
+              type="text"
+              maxlength="100"
+              placeholder="e.g. bc-class-7l"
+              pattern="[a-z0-9]+(-[a-z0-9]+)*"
+              required
+            >
+            <small>Lowercase letters, numbers and hyphens only.</small>
+
+            <label for="exam-status">Status</label>
+            <select id="exam-status" required>
+              <option value="draft">Draft</option>
+              <option value="published">Published</option>
+              <option value="archived">Archived</option>
+            </select>
+
+            <label for="exam-default-language">Default Language</label>
+            <select id="exam-default-language" required></select>
+
+            <label for="exam-question-count">Official Exam Question Count</label>
+            <input
+              id="exam-question-count"
+              type="number"
+              min="1"
+              max="1000"
+              value="50"
+              required
+            >
+
+            <label for="exam-time-limit">Time Limit (Minutes)</label>
+            <input
+              id="exam-time-limit"
+              type="number"
+              min="1"
+              max="600"
+              placeholder="e.g. 45"
+            >
+            <small>Leave blank if the exam has no time limit.</small>
+
+            <label for="exam-passing-score">Passing Score (%)</label>
+            <input
+              id="exam-passing-score"
+              type="number"
+              min="1"
+              max="100"
+              value="80"
+              required
+            >
+
+            <div class="exam-translations-heading">
+              <h3>Language Translations</h3>
+              <p class="muted-text">
+                Provide a title and description for every enabled language.
+              </p>
+            </div>
+
+            <div id="exam-translations"></div>
+
+            <p id="exam-form-message" class="admin-message" role="alert"></p>
+
+            <div class="modal-actions">
+              <button
+                type="button"
+                id="cancel-exam-button"
+                class="secondary-button"
+              >Cancel</button>
+              <button
+                type="submit"
+                id="save-exam-button"
+                class="primary-button"
+              >Save Exam</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <footer class="admin-footer">
+        North America Exam Practice CMS
+      </footer>
+    </main>
+  </div>
+
+  <script src="/admin/js/dashboard.js"></script>
+  <script src="/admin/js/exams.js"></script>
+</body>
+</html>

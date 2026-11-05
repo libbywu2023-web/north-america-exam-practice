@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Login | North America Exam Practice</title>
+  <link rel="stylesheet" href="/admin/css/admin.css">
+</head>
+<body class="admin-login-page">
+
+  <main class="login-container">
+    <div class="login-brand">
+      <div class="login-logo">EP</div>
+      <h1>Exam Practice CMS</h1>
+      <p>North America Exam Practice</p>
+    </div>
+
+    <form id="login-form" class="login-form">
+      <h2>Administrator Login</h2>
+      <p class="login-description">
+        Sign in to manage exams and question banks.
+      </p>
+
+      <label for="password">Admin Password</label>
+      <input
+        type="password"
+        id="password"
+        name="password"
+        placeholder="Enter your admin password"
+        autocomplete="current-password"
+        required
+      >
+
+      <button type="submit" id="login-button">
+        Sign In
+      </button>
+
+      <p id="login-error" class="form-error" role="alert"></p>
+    </form>
+
+    <footer class="login-footer">
+      North America Exam Practice CMS
+    </footer>
+  </main>
+
+  <script src="/admin/js/login.js"></script>
+</body>
+</html>

@@ -1,0 +1,239 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Countries | Exam Practice CMS</title>
+  <link rel="stylesheet" href="/admin/css/admin.css">
+</head>
+<body class="dashboard-page">
+
+  <header class="admin-header">
+    <a class="admin-brand" href="/admin/dashboard/">
+      <span class="admin-logo">EP</span>
+      <span>Exam Practice CMS</span>
+    </a>
+
+    <div class="admin-header-right">
+      <span class="admin-user">Administrator</span>
+      <button id="logout-button" class="logout-button">
+        Sign Out
+      </button>
+    </div>
+  </header>
+
+  <div class="admin-layout">
+
+    <aside class="admin-sidebar">
+      <div class="sidebar-label">MAIN MENU</div>
+
+      <a class="sidebar-link" href="/admin/dashboard/">
+        <span>▦</span> Dashboard
+      </a>
+
+      <div class="sidebar-label">CONTENT MANAGEMENT</div>
+
+      <a class="sidebar-link active" href="/admin/countries/">
+        <span>🌎</span> Countries
+      </a>
+
+      <div class="sidebar-link disabled">
+        <span>📍</span> Regions
+        <small>Coming soon</small>
+      </div>
+
+      <div class="sidebar-link disabled">
+        <span>📚</span> Exam Categories
+        <small>Coming soon</small>
+      </div>
+
+      <div class="sidebar-link disabled">
+        <span>📝</span> Exams
+        <small>Coming soon</small>
+      </div>
+
+      <div class="sidebar-link disabled">
+        <span>📂</span> Topics
+        <small>Coming soon</small>
+      </div>
+
+      <div class="sidebar-link disabled">
+        <span>❓</span> Questions
+        <small>Coming soon</small>
+      </div>
+
+      <div class="sidebar-link disabled">
+        <span>🌐</span> Languages
+        <small>Coming soon</small>
+      </div>
+    </aside>
+
+    <main class="admin-main">
+
+      <div class="page-heading">
+        <div>
+          <h1>Countries</h1>
+          <p>Manage countries supported by the platform.</p>
+        </div>
+
+        <button id="add-country-button" class="primary-button">
+          + Add Country
+        </button>
+      </div>
+
+      <section class="dashboard-welcome">
+        <h2>Country Management</h2>
+        <p>
+          Manage country codes and multilingual country names.
+          Each country can have translations in all enabled languages.
+        </p>
+      </section>
+
+      <section class="module-card countries-toolbar">
+        <div>
+          <label for="country-search">Search countries</label>
+          <input
+            type="search"
+            id="country-search"
+            placeholder="Search by code or country name..."
+          >
+        </div>
+
+        <div id="country-count">
+          Loading countries...
+        </div>
+      </section>
+
+      <section class="module-card countries-table-card">
+
+        <div class="table-heading">
+          <h2>Country List</h2>
+          <button id="refresh-countries-button" class="secondary-button">
+            Refresh
+          </button>
+        </div>
+
+        <div class="table-responsive">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Code</th>
+                <th>English</th>
+                <th>Simplified Chinese</th>
+                <th>Traditional Chinese</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+
+            <tbody id="countries-table-body">
+              <tr>
+                <td colspan="6">Loading countries...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </section>
+
+
+<!-- Add / Edit Country Modal -->
+<div id="country-modal" class="admin-modal" hidden>
+  <div class="admin-modal-backdrop" id="modal-backdrop"></div>
+
+  <div class="admin-modal-content">
+    <div class="modal-heading">
+      <div>
+        <h2 id="country-modal-title">Add Country</h2>
+        <p>Enter country code and multilingual names.</p>
+      </div>
+      <button
+        type="button"
+        id="close-country-modal"
+        class="modal-close-button"
+        aria-label="Close"
+      >×</button>
+    </div>
+
+    <form id="country-form">
+      <div class="form-field">
+        <label for="country-code">Country Code *</label>
+        <input
+          id="country-code"
+          name="code"
+          type="text"
+          maxlength="3"
+          placeholder="e.g. US"
+          pattern="[A-Z]{2,3}"
+          required
+        >
+        <small>Use a 2 or 3 letter uppercase code, such as CA or US.</small>
+      </div>
+
+      <div class="form-field">
+        <label for="country-name-en">English Name *</label>
+        <input
+          id="country-name-en"
+          name="en"
+          type="text"
+          placeholder="e.g. United States"
+          required
+        >
+      </div>
+
+      <div class="form-field">
+        <label for="country-name-zh-cn">简体中文名称 *</label>
+        <input
+          id="country-name-zh-cn"
+          name="zh-CN"
+          type="text"
+          placeholder="例如：美国"
+          required
+        >
+      </div>
+
+      <div class="form-field">
+        <label for="country-name-zh-tw">繁體中文名稱 *</label>
+        <input
+          id="country-name-zh-tw"
+          name="zh-TW"
+          type="text"
+          placeholder="例如：美國"
+          required
+        >
+      </div>
+
+      <p id="country-form-error" class="form-message error"></p>
+
+      <div class="modal-actions">
+        <button
+          type="button"
+          id="cancel-country-button"
+          class="secondary-button"
+        >Cancel</button>
+
+        <button
+          type="submit"
+          id="save-country-button"
+          class="primary-button"
+        >Save Country</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+
+      <p id="countries-message" class="form-message" role="status"></p>
+
+      <footer class="admin-footer">
+        North America Exam Practice CMS
+      </footer>
+
+    </main>
+  </div>
+
+    <script src="/admin/js/dashboard.js"></script>
+    <script src="/admin/js/countries.js"></script>
+</body>
+</html>

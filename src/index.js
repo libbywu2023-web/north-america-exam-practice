@@ -1,4 +1,10 @@
 import { handleAdminAuth } from "./admin-auth.js";
+import { handleAdminCountries } from "./admin-countries.js";
+import { handleAdminRegions } from "./admin-regions.js";
+import { handleAdminCategories } from "./admin-categories.js";
+import { handleAdminExams } from "./admin-exams.js";
+import { handleAdminTopics } from "./admin-topics.js";
+
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
   "cache-control": "no-store"
@@ -26,7 +32,7 @@ function shuffle(items) {
   return result;
 }
 
-async function getPublishedExam(db, slug) {
+function getPublishedExam(db) {
   return db.prepare(`
     SELECT e.*, et.title, et.description, r.code AS region_code,
            c.code AS country_code, c.name AS country_name
@@ -56,21 +62,71 @@ async function listExams(db, lang) {
 }
 
 async function getQuestionRows(db, examId, lang, topicSlug = null) {
-  const topicFilter = topicSlug ? "AND t.slug = ?" : "";
-  const values = topicSlug ? [examId, lang, lang, topicSlug] : [examId, lang, lang];
+  let topicCondition = "";
+  let orderClause = "ORDER BY q.id";
+  let limitClause = "";
+  const values = [lang, lang, examId];
+
+  // If a topic slug is provided, determine whether it is
+  // a standard topic or the exam's mixed-practice topic.
+  if (topicSlug) {
+    const topic = await db.prepare(`
+      SELECT id, topic_type, selection_mode, random_question_count
+      FROM topics
+      WHERE exam_id = ? AND slug = ?
+    `).bind(examId, topicSlug).first();
+
+    // Unknown topic: return no questions.
+    if (!topic) {
+      return [];
+    }
+
+    if (topic.topic_type === "mixed") {
+      // Mixed Practice includes questions from all standard topics.
+      topicCondition = "AND t.topic_type = 'standard'";
+
+      if (topic.selection_mode === "random") {
+        const count = Number(topic.random_question_count);
+
+        if (!Number.isInteger(count) || count < 1) {
+          return [];
+        }
+
+        orderClause = "ORDER BY RANDOM()";
+        limitClause = "LIMIT ?";
+        values.push(count);
+      }
+    } else {
+      // Standard topic: only return its own questions.
+      topicCondition = "AND t.slug = ?";
+      values.push(topicSlug);
+    }
+  }
+
   const result = await db.prepare(`
-    SELECT q.id, q.difficulty, q.topic_id,
-           COALESCE(tt.name, 'General') AS topic_name,
-           qt.question_text, qt.explanation
+    SELECT
+      q.id,
+      q.difficulty,
+      q.topic_id,
+      COALESCE(tt.name, 'General') AS topic_name,
+      qt.question_text,
+      qt.explanation
     FROM questions q
     JOIN question_translations qt
-      ON qt.question_id = q.id AND qt.language_code = ?
-    LEFT JOIN topics t ON t.id = q.topic_id
+      ON qt.question_id = q.id
+      AND qt.language_code = ?
+    LEFT JOIN topics t
+      ON t.id = q.topic_id
     LEFT JOIN topic_translations tt
-      ON tt.topic_id = t.id AND tt.language_code = ?
-    WHERE q.exam_id = ? AND q.status = 'published' ${topicFilter}
-    ORDER BY q.id
-  `).bind(lang, lang, examId, ...(topicSlug ? [topicSlug] : [])).all();
+      ON tt.topic_id = t.id
+      AND tt.language_code = ?
+    WHERE q.exam_id = ?
+      AND q.status = 'published'
+      ${topicCondition}
+    ${orderClause}
+    ${limitClause}
+  `).bind(...values).all();
+
   return result.results || [];
 }
 
@@ -103,17 +159,28 @@ async function api(request, env) {
 
   const examMatch = path.match(/^\/api\/exams\/([a-z0-9-]+)$/);
   if (request.method === "GET" && examMatch) {
-    const exam = await getPublishedExam(env.DB, lang).bind(lang, examMatch[1]).first();
+    const exam = await getPublishedExam(env.DB)
+  .bind(lang, examMatch[1])
+  .first();
     if (!exam) return json({ error: "Exam not found" }, 404);
-    const topics = await env.DB.prepare(`
-      SELECT t.slug, COALESCE(tt.name, t.slug) AS name
-      FROM topics t
-      LEFT JOIN topic_translations tt
-        ON tt.topic_id = t.id AND tt.language_code = ?
-      WHERE t.exam_id = ?
-      ORDER BY t.sort_order
-    `).bind(lang, exam.id).all();
-    return json({ exam, topics: topics.results || [] });
+const topics = await env.DB.prepare(`
+  SELECT
+    t.id,
+    t.slug,
+    COALESCE(tt.name, t.slug) AS name,
+    t.sort_order,
+    t.topic_type,
+    t.selection_mode,
+    t.random_question_count
+  FROM topics t
+  LEFT JOIN topic_translations tt
+    ON tt.topic_id = t.id
+    AND tt.language_code = ?
+  WHERE t.exam_id = ?
+  ORDER BY t.sort_order
+`).bind(lang, exam.id).all();
+
+return json({ exam, topics: topics.results || [] });
   }
 
   const questionsMatch = path.match(/^\/api\/exams\/([a-z0-9-]+)\/questions$/);
@@ -346,9 +413,26 @@ export default {
     const url = new URL(request.url);
     try {
       // Admin authentication routes
-      if (url.pathname.startsWith("/api/admin/")) {
-        return await handleAdminAuth(request, env);
-      }
+      if (url.pathname.startsWith("/api/admin/countries")) {
+  return await handleAdminCountries(request, env);
+}
+
+if (url.pathname.startsWith("/api/admin/regions")) {
+  return await handleAdminRegions(request, env);
+}
+if (url.pathname.startsWith("/api/admin/categories")) {
+  return await handleAdminCategories(request, env);
+}
+if (url.pathname.startsWith("/api/admin/exams")) {
+  return await handleAdminExams(request, env);
+}
+if (url.pathname.startsWith("/api/admin/topics")) {
+return await handleAdminTopics(request, env);
+}
+
+if (url.pathname.startsWith("/api/admin/")) {
+  return await handleAdminAuth(request, env);
+}
       if (url.pathname.startsWith("/api/")) {
         if (request.method === "OPTIONS") {
           return new Response(null, {

@@ -1,0 +1,212 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Exam Categories | Exam Practice CMS</title>
+  <link rel="stylesheet" href="/admin/css/admin.css">
+</head>
+<body class="dashboard-page">
+
+  <header class="admin-header">
+    <a class="admin-brand" href="/admin/dashboard/">
+      <span class="admin-logo">EP</span>
+      <span>Exam Practice CMS</span>
+    </a>
+
+    <div class="admin-header-right">
+      <span class="admin-user">Administrator</span>
+      <button id="logout-button" class="logout-button">
+        Sign Out
+      </button>
+    </div>
+  </header>
+
+  <div class="admin-layout">
+
+    <aside class="admin-sidebar">
+      <div class="sidebar-label">MAIN MENU</div>
+
+      <a class="sidebar-link" href="/admin/dashboard/">
+        <span>▦</span> Dashboard
+      </a>
+
+      <div class="sidebar-label">CONTENT MANAGEMENT</div>
+
+      <a class="sidebar-link" href="/admin/countries/">
+        <span>🌎</span> Countries
+      </a>
+
+      <a class="sidebar-link" href="/admin/regions/">
+        <span>📍</span> Regions
+      </a>
+
+      <a class="sidebar-link active" href="/admin/categories/">
+        <span>📚</span> Exam Categories
+      </a>
+
+      <div class="sidebar-link disabled">
+        <span>📝</span> Exams
+        <small>Coming soon</small>
+      </div>
+
+      <div class="sidebar-link disabled">
+        <span>📂</span> Topics
+        <small>Coming soon</small>
+      </div>
+
+      <div class="sidebar-link disabled">
+        <span>❓</span> Questions
+        <small>Coming soon</small>
+      </div>
+
+      <div class="sidebar-link disabled">
+        <span>🌐</span> Languages
+        <small>Coming soon</small>
+      </div>
+    </aside>
+
+    <main class="admin-main">
+
+      <div class="page-heading">
+        <div>
+          <h1>Exam Categories</h1>
+          <p>Manage independent, top-level exam categories.</p>
+        </div>
+
+        <button id="add-category-button" class="primary-button">
+          + Add Category
+        </button>
+      </div>
+
+      <section class="dashboard-welcome">
+        <h2>Category Management</h2>
+        <p>
+          Manage independent exam categories such as Car Driving,
+          Motorcycle, Citizenship and Professional Licensing.
+        </p>
+      </section>
+
+      <section class="module-card countries-toolbar">
+
+        <div>
+          <label for="category-search">Search categories</label>
+          <input
+            type="search"
+            id="category-search"
+            placeholder="Search slug or category name..."
+          >
+        </div>
+
+        <div id="category-count">
+          Loading categories...
+        </div>
+
+      </section>
+
+      <section class="module-card countries-table-card">
+
+        <div class="table-heading">
+          <h2>Category List</h2>
+
+          <button
+            id="refresh-categories-button"
+            class="secondary-button"
+          >
+            Refresh
+          </button>
+        </div>
+
+        <div class="table-responsive">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Slug</th>
+                <th>English</th>
+                <th>Simplified Chinese</th>
+                <th>Traditional Chinese</th>
+                <th>Exams</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+
+            <tbody id="categories-table-body">
+              <tr>
+                <td colspan="7">Loading categories...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </section>
+
+      <p id="categories-message" class="form-message" role="status"></p>
+
+      <div id="category-modal" class="admin-modal hidden">
+        <div class="admin-modal-content">
+
+          <div class="modal-header">
+            <h2 id="category-modal-title">Add Category</h2>
+            <button
+              type="button"
+              id="close-category-modal"
+              class="modal-close"
+            >×</button>
+          </div>
+
+          <form id="category-form">
+            <input type="hidden" id="category-id">
+
+            <label for="category-slug">URL Slug</label>
+            <input
+              id="category-slug"
+              type="text"
+              maxlength="80"
+              placeholder="e.g. car-driving"
+              pattern="[a-z0-9]+(-[a-z0-9]+)*"
+              required
+            >
+            <small>Lowercase letters, numbers and hyphens only.</small>
+
+            <label for="category-name-en">English Name</label>
+            <input id="category-name-en" type="text" maxlength="150" required>
+
+            <label for="category-name-zh-cn">Simplified Chinese Name</label>
+            <input id="category-name-zh-cn" type="text" maxlength="150" required>
+
+            <label for="category-name-zh-tw">Traditional Chinese Name</label>
+            <input id="category-name-zh-tw" type="text" maxlength="150" required>
+
+            <p id="category-form-message" class="admin-message"></p>
+
+            <div class="modal-actions">
+              <button
+                type="button"
+                id="cancel-category-button"
+                class="secondary-button"
+              >Cancel</button>
+
+              <button
+                type="submit"
+                id="save-category-button"
+                class="primary-button"
+              >Save Category</button>
+            </div>
+          </form>
+
+        </div>
+      </div>
+
+      <footer class="admin-footer">
+        North America Exam Practice CMS
+      </footer>
+
+    </main>
+  </div>
+
+  <script src="/admin/js/dashboard.js"></script>
+  <script src="/admin/js/categories.js"></script>
+</body>
+</html>

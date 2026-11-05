@@ -1,0 +1,155 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard | Exam Practice CMS</title>
+  <link rel="stylesheet" href="/admin/css/admin.css">
+</head>
+<body class="dashboard-page">
+
+  <header class="admin-header">
+    <a class="admin-brand" href="/admin/dashboard/">
+      <span class="admin-logo">EP</span>
+      <span>Exam Practice CMS</span>
+    </a>
+
+    <div class="admin-header-right">
+      <span class="admin-user">Administrator</span>
+      <button id="logout-button" class="logout-button">
+        Sign Out
+      </button>
+    </div>
+  </header>
+
+  <div class="admin-layout">
+
+    <aside class="admin-sidebar">
+      <div class="sidebar-label">MAIN MENU</div>
+
+      <a class="sidebar-link active" href="/admin/dashboard/">
+        <span>▦</span> Dashboard
+      </a>
+
+      <div class="sidebar-label">CONTENT MANAGEMENT</div>
+
+      <a class="sidebar-link" href="/admin/countries/">
+        <span>🌎</span> Countries
+      </a>
+
+  <a class="sidebar-link" href="/admin/regions/">
+  <span>📍</span> Regions
+</a>
+
+      <div class="sidebar-link disabled">
+        <span>📚</span> Exam Categories
+        <small>Coming soon</small>
+      </div>
+
+      <div class="sidebar-link disabled">
+        <span>📝</span> Exams
+        <small>Coming soon</small>
+      </div>
+
+      <div class="sidebar-link disabled">
+        <span>📂</span> Topics
+        <small>Coming soon</small>
+      </div>
+
+      <div class="sidebar-link disabled">
+        <span>❓</span> Questions
+        <small>Coming soon</small>
+      </div>
+
+      <div class="sidebar-link disabled">
+        <span>🌐</span> Languages
+        <small>Coming soon</small>
+      </div>
+    </aside>
+
+    <main class="admin-main">
+
+      <div class="page-heading">
+        <div>
+          <h1>Dashboard</h1>
+          <p>Welcome to North America Exam Practice CMS.</p>
+        </div>
+        <span class="system-status">
+          ● System connected
+        </span>
+      </div>
+
+      <section class="dashboard-welcome">
+        <h2>Welcome to your administration center</h2>
+        <p>
+          Manage countries, regions, examinations, topics,
+          questions and multilingual content from one place.
+        </p>
+      </section>
+
+      <h2 class="section-heading">Management Modules</h2>
+
+      <section class="module-grid">
+
+        <a class="module-card" href="/admin/countries/">
+          <div class="module-icon">🌎</div>
+          <h3>Countries</h3>
+          <p>Manage countries supported by the platform.</p>
+          <span class="module-status">Manage countries →</span>
+        </a>
+
+<a class="module-card" href="/admin/regions/">
+  <div class="module-icon">📍</div>
+  <h3>Regions</h3>
+  <p>Manage states, provinces and territories.</p>
+  <span class="module-status">Manage regions →</span>
+</a>
+
+        <article class="module-card">
+          <div class="module-icon">📚</div>
+          <h3>Exam Categories</h3>
+          <p>Organize different types of examinations.</p>
+          <span class="module-status">Coming soon</span>
+        </article>
+
+        <article class="module-card">
+          <div class="module-icon">📝</div>
+          <h3>Exams</h3>
+          <p>Create and manage examination collections.</p>
+          <span class="module-status">Coming soon</span>
+        </article>
+
+        <article class="module-card">
+          <div class="module-icon">📂</div>
+          <h3>Topics</h3>
+          <p>Organize questions into learning topics.</p>
+          <span class="module-status">Coming soon</span>
+        </article>
+
+        <article class="module-card">
+          <div class="module-icon">❓</div>
+          <h3>Questions</h3>
+          <p>Manage questions, options and explanations.</p>
+          <span class="module-status">Coming soon</span>
+        </article>
+
+        <article class="module-card">
+          <div class="module-icon">🌐</div>
+          <h3>Languages</h3>
+          <p>Configure languages and translations.</p>
+          <span class="module-status">Coming soon</span>
+        </article>
+
+      </section>
+
+      <footer class="admin-footer">
+        North America Exam Practice CMS
+      </footer>
+
+    </main>
+  </div>
+
+  <script src="/admin/js/dashboard.js"></script>
+</body>
+</html>

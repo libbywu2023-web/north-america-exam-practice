@@ -1,0 +1,49 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Login - Exam Practice</title>
+  <link rel="stylesheet" href="/admin/css/admin.css">
+</head>
+<body>
+  <main class="admin-login-page">
+    <div class="login-container">
+
+      <div class="login-brand">
+        <div class="login-logo">EP</div>
+        <h1>Exam Practice Admin</h1>
+        <p>Manage your exam practice platform</p>
+      </div>
+
+      <form class="login-form" id="login-form">
+        <h2>Welcome back</h2>
+        <p class="login-description">Enter your administrator password to continue.</p>
+
+        <div class="form-field">
+          <label for="password">Admin Password</label>
+          <input
+            id="password"
+            name="password"
+            type="password"
+            autocomplete="current-password"
+            required
+          >
+        </div>
+
+        <p id="login-error" class="form-error" role="alert"></p>
+
+        <button type="submit" id="login-button">Sign In</button>
+      </form>
+
+      <div class="login-footer">
+        Exam Practice Platform · Administration
+      </div>
+
+    </div>
+  </main>
+
+  <script src="/admin/js/login.js"></script>
+</body>
+</html>

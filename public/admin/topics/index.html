@@ -1,0 +1,244 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Topics | Exam Practice CMS</title>
+  <link rel="stylesheet" href="/admin/css/admin.css">
+</head>
+<body class="dashboard-page">
+
+  <header class="admin-header">
+    <a class="admin-brand" href="/admin/dashboard/">
+      <span class="admin-logo">EP</span>
+      <span>Exam Practice CMS</span>
+    </a>
+    <div class="admin-header-right">
+      <span class="admin-user">Administrator</span>
+      <button id="logout-button" class="logout-button">Sign Out</button>
+    </div>
+  </header>
+
+  <div class="admin-layout">
+    <aside class="admin-sidebar">
+      <div class="sidebar-label">MAIN MENU</div>
+      <a class="sidebar-link" href="/admin/dashboard/">
+        <span>▦</span> Dashboard
+      </a>
+
+      <div class="sidebar-label">CONTENT MANAGEMENT</div>
+      <a class="sidebar-link" href="/admin/countries/">
+        <span>🌎</span> Countries
+      </a>
+      <a class="sidebar-link" href="/admin/regions/">
+        <span>📍</span> Regions
+      </a>
+      <a class="sidebar-link" href="/admin/categories/">
+        <span>📚</span> Exam Categories
+      </a>
+      <a class="sidebar-link" href="/admin/exams/">
+        <span>📝</span> Exams
+      </a>
+      <a class="sidebar-link active" href="/admin/topics/">
+        <span>📂</span> Topics
+      </a>
+      <div class="sidebar-link disabled">
+        <span>❓</span> Questions
+        <small>Coming soon</small>
+      </div>
+      <div class="sidebar-link disabled">
+        <span>🌐</span> Languages
+        <small>Coming soon</small>
+      </div>
+    </aside>
+
+    <main class="admin-main">
+      <div class="page-heading">
+        <div>
+          <h1>Topics</h1>
+          <p>Manage exam topics and mixed practice settings.</p>
+        </div>
+        <button id="add-topic-button" class="primary-button">
+          + Add Topic
+        </button>
+      </div>
+
+      <section class="dashboard-welcome">
+        <h2>Topic Management</h2>
+        <p>
+          Organize questions into standard topics, or create one Mixed
+          Practice topic for each exam. Mixed Practice automatically
+          includes questions from all standard topics in that exam.
+        </p>
+      </section>
+
+      <section class="module-card countries-toolbar">
+        <div>
+          <label for="exam-filter">Filter by Exam</label>
+          <select id="exam-filter">
+            <option value="">All exams</option>
+          </select>
+        </div>
+        <div>
+          <label for="topic-search">Search topics</label>
+          <input
+            type="search"
+            id="topic-search"
+            placeholder="Search topic name or slug..."
+          >
+        </div>
+        <div id="topic-count">Loading topics...</div>
+      </section>
+
+      <section class="module-card countries-table-card">
+        <div class="table-heading">
+          <h2>Topic List</h2>
+          <button id="refresh-topics-button" class="secondary-button">
+            Refresh
+          </button>
+        </div>
+
+        <div class="table-responsive">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Topic</th>
+                <th>Exam</th>
+                <th>Type</th>
+                <th>Selection</th>
+                <th>Questions</th>
+                <th>Sort</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="topics-table-body">
+              <tr>
+                <td colspan="8">Loading topics...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <p id="topics-message" class="form-message" role="status"></p>
+
+      <div id="topic-modal" class="admin-modal hidden">
+        <div class="admin-modal-content exam-modal-content">
+          <div class="modal-header">
+            <div>
+              <h2 id="topic-modal-title">Add Topic</h2>
+              <p class="muted-text">
+                Configure topic details and language translations.
+              </p>
+            </div>
+            <button
+              type="button"
+              id="close-topic-modal"
+              class="modal-close"
+            >×</button>
+          </div>
+
+          <form id="topic-form">
+            <input type="hidden" id="topic-id">
+
+            <label for="topic-exam">Exam</label>
+            <select id="topic-exam" required></select>
+
+            <label for="topic-type">Topic Type</label>
+            <select id="topic-type" required>
+              <option value="standard">Standard Topic</option>
+              <option value="mixed">Mixed Practice</option>
+            </select>
+
+            <label for="topic-slug">URL Slug</label>
+            <input
+              id="topic-slug"
+              type="text"
+              maxlength="100"
+              placeholder="e.g. road-signs"
+              pattern="[a-z0-9]+(-[a-z0-9]+)*"
+              required
+            >
+            <small>Lowercase letters, numbers and hyphens only.</small>
+
+            <label for="topic-sort-order">Sort Order</label>
+            <input
+              id="topic-sort-order"
+              type="number"
+              min="0"
+              step="1"
+              value="1"
+              required
+            >
+
+            <section id="mixed-settings" class="hidden">
+              <div class="exam-translations-heading">
+                <h3>Mixed Practice Settings</h3>
+                <p class="muted-text">
+                  Questions are automatically collected from all standard
+                  topics in this exam.
+                </p>
+              </div>
+
+              <label for="topic-selection-mode">Question Selection</label>
+              <select id="topic-selection-mode">
+                <option value="all">All Published Questions</option>
+                <option value="random">Random N Questions</option>
+              </select>
+
+              <div id="random-count-field" class="hidden">
+                <label for="topic-random-count">Number of Questions</label>
+                <input
+                  id="topic-random-count"
+                  type="number"
+                  min="1"
+                  max="1000"
+                  step="1"
+                  value="20"
+                >
+                <small>
+                  The system randomly selects this many questions
+                  when the user starts Mixed Practice.
+                </small>
+              </div>
+            </section>
+
+            <div class="exam-translations-heading">
+              <h3>Language Translations</h3>
+              <p class="muted-text">
+                Provide a name for every enabled language.
+              </p>
+            </div>
+
+            <div id="topic-translations"></div>
+
+            <p id="topic-form-message" class="admin-message" role="alert"></p>
+
+            <div class="modal-actions">
+              <button
+                type="button"
+                id="cancel-topic-button"
+                class="secondary-button"
+              >Cancel</button>
+              <button
+                type="submit"
+                id="save-topic-button"
+                class="primary-button"
+              >Save Topic</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <footer class="admin-footer">
+        North America Exam Practice CMS
+      </footer>
+    </main>
+  </div>
+
+  <script src="/admin/js/dashboard.js"></script>
+  <script src="/admin/js/topics.js"></script>
+</body>
+</html>
