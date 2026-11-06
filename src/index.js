@@ -1,9 +1,13 @@
 import { handleAdminAuth } from "./admin-auth.js";
+import { handleAdminLanguages } from "./admin-languages.js";
 import { handleAdminCountries } from "./admin-countries.js";
 import { handleAdminRegions } from "./admin-regions.js";
 import { handleAdminCategories } from "./admin-categories.js";
 import { handleAdminExams } from "./admin-exams.js";
 import { handleAdminTopics } from "./admin-topics.js";
+import { handleAdminQuestions } from "./admin-questions.js";
+import { handleAdminImages, handlePublicImage } from "./admin-images.js";
+
 
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
@@ -142,6 +146,69 @@ async function questionOptions(db, questionId, lang) {
   return result.results || [];
 }
 
+// Load all images for an exam in one query and group them by question.
+async function getExamQuestionImages(db, examId) {
+  const result = await db.prepare(`
+    SELECT
+      qi.question_id,
+      qi.image_url,
+      qi.alt_text,
+      qi.sort_order
+    FROM question_images qi
+    JOIN questions q ON q.id = qi.question_id
+    WHERE q.exam_id = ?
+      AND q.status = 'published'
+    ORDER BY qi.question_id, qi.sort_order
+  `).bind(examId).all();
+
+  const imagesByQuestion = new Map();
+
+  for (const row of result.results || []) {
+    if (!imagesByQuestion.has(row.question_id)) {
+      imagesByQuestion.set(row.question_id, []);
+    }
+
+    imagesByQuestion.get(row.question_id).push({
+      url: row.image_url,
+      alt: row.alt_text,
+      sort_order: row.sort_order
+    });
+  }
+
+  return imagesByQuestion;
+}
+
+// Load images belonging to a specific mock exam attempt.
+async function getAttemptQuestionImages(db, attemptId) {
+  const result = await db.prepare(`
+    SELECT
+      aq.question_id,
+      qi.image_url,
+      qi.alt_text,
+      qi.sort_order
+    FROM attempt_questions aq
+    JOIN question_images qi ON qi.question_id = aq.question_id
+    WHERE aq.attempt_id = ?
+    ORDER BY aq.sort_order, qi.sort_order
+  `).bind(attemptId).all();
+
+  const imagesByQuestion = new Map();
+
+  for (const row of result.results || []) {
+    if (!imagesByQuestion.has(row.question_id)) {
+      imagesByQuestion.set(row.question_id, []);
+    }
+
+    imagesByQuestion.get(row.question_id).push({
+      url: row.image_url,
+      alt: row.alt_text,
+      sort_order: row.sort_order
+    });
+  }
+
+  return imagesByQuestion;
+}
+
 async function api(request, env) {
   if (!env.DB) return json({ error: "D1 binding DB is not configured." }, 500);
   const url = new URL(request.url);
@@ -171,14 +238,24 @@ const topics = await env.DB.prepare(`
     t.sort_order,
     t.topic_type,
     t.selection_mode,
-    t.random_question_count
+    t.random_question_count,
+    (
+      SELECT COUNT(*)
+      FROM questions q
+      JOIN question_translations qt
+        ON qt.question_id = q.id
+        AND qt.language_code = ?
+      WHERE q.exam_id = t.exam_id
+        AND q.topic_id = t.id
+        AND q.status = 'published'
+    ) AS question_count
   FROM topics t
   LEFT JOIN topic_translations tt
     ON tt.topic_id = t.id
     AND tt.language_code = ?
   WHERE t.exam_id = ?
   ORDER BY t.sort_order
-`).bind(lang, exam.id).all();
+`).bind(lang, lang, exam.id).all();
 
 return json({ exam, topics: topics.results || [] });
   }
@@ -192,6 +269,8 @@ return json({ exam, topics: topics.results || [] });
     const rows = await getQuestionRows(
       env.DB, exam.id, lang, url.searchParams.get("topic")
     );
+    const imagesByQuestion = await getExamQuestionImages(env.DB, exam.id);
+
     const questions = [];
     for (const row of rows) {
       questions.push({
@@ -199,6 +278,7 @@ return json({ exam, topics: topics.results || [] });
         difficulty: row.difficulty,
         topic: row.topic_name,
         question: row.question_text,
+        images: imagesByQuestion.get(row.id) || [],
         options: await questionOptions(env.DB, row.id, lang)
       });
     }
@@ -309,6 +389,7 @@ if (request.method === "POST" && path === "/api/mock/start") {
       questionMap.set(row.id, {
         id: row.id,
         question: row.question_text,
+        images: [],
         options: []
       });
     }
@@ -319,6 +400,14 @@ if (request.method === "POST" && path === "/api/mock/start") {
       sort_order: row.sort_order,
       option_text: row.option_text
     });
+  }
+
+  // Load all images for this attempt in one query.
+  const imagesByQuestion = await getAttemptQuestionImages(env.DB, attemptId);
+
+  for (const [questionId, images] of imagesByQuestion) {
+    const question = questionMap.get(questionId);
+    if (question) question.images = images;
   }
 
   return json({
@@ -412,6 +501,9 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     try {
+      if (url.pathname.startsWith("/api/admin/languages")) {
+  return await handleAdminLanguages(request, env);
+}
       // Admin authentication routes
       if (url.pathname.startsWith("/api/admin/countries")) {
   return await handleAdminCountries(request, env);
@@ -429,7 +521,12 @@ if (url.pathname.startsWith("/api/admin/exams")) {
 if (url.pathname.startsWith("/api/admin/topics")) {
 return await handleAdminTopics(request, env);
 }
-
+if (url.pathname.startsWith("/api/admin/questions")) {
+  return await handleAdminQuestions(request, env);
+}
+if (url.pathname === "/api/admin/images") {
+  return await handleAdminImages(request, env);
+}
 if (url.pathname.startsWith("/api/admin/")) {
   return await handleAdminAuth(request, env);
 }
@@ -447,6 +544,10 @@ if (url.pathname.startsWith("/api/admin/")) {
         }
         return await api(request, env);
       }
+
+      if (url.pathname.startsWith("/images/questions/")) {
+  return await handlePublicImage(request, env);
+}
       return env.ASSETS.fetch(request);
     } catch (error) {
       console.error("Request failed", error);

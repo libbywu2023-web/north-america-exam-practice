@@ -7,8 +7,6 @@ const t = copy[lang];
 setLanguageSelect(lang);
 document.documentElement.lang = lang;
 
-const isChinese = lang !== "en";
-
 const labels = {
   allTopics: {
     en: "Practice all questions",
@@ -20,34 +18,13 @@ const labels = {
     "zh-CN": "按知识点练习",
     "zh-TW": "按知識點練習"
   },
-  mixed: {
-    en: "Mixed Practice",
-    "zh-CN": "混合练习",
-    "zh-TW": "混合練習"
-  },
   questionCount: {
-    en: "sample questions",
-    "zh-CN": "道示例题",
-    "zh-TW": "道示例題"
-  },
-  loading: {
-    en: "Loading...",
-    "zh-CN": "正在加载...",
-    "zh-TW": "正在載入..."
+    en: "questions",
+    "zh-CN": "道题",
+    "zh-TW": "道題"
   }
 };
 
-document.querySelector("#page-title").textContent =
-  lang === "zh-CN" ? "练习 BC 驾驶知识测试" :
-  lang === "zh-TW" ? "練習 BC 駕駛知識測驗" :
-  "Practice for your BC driving knowledge test";
-
-document.querySelector("#intro").textContent =
-  lang === "zh-CN" ? "选择学习模式，一题一题建立信心。" :
-  lang === "zh-TW" ? "選擇學習模式，一題一題建立信心。" :
-  "Choose a study mode and build confidence one question at a time.";
-
-//document.querySelector("#mock-title").textContent = t.mock;
 document.querySelector("#disclaimer").textContent = t.disclaimer;
 
 const root = document.querySelector("#exam-card");
@@ -78,12 +55,25 @@ try {
 
     const topics = detail.topics || [];
 
+    const standardTopics = topics
+      .filter(topic => topic.topic_type !== "mixed")
+      .sort((a, b) => a.sort_order - b.sort_order);
+
+    const totalQuestionCount = standardTopics.reduce(
+      (total, topic) => total + Number(topic.question_count || 0),
+      0
+    );
+
     root.innerHTML = "";
 
     const eyebrow = document.createElement("p");
-    eyebrow.className = "eyebrow";
+    eyebrow.className = "eyebrow exam-location";
     eyebrow.textContent =
-      `${exam.country_code || "CA"} · ${exam.region_code || "BC"} · ${(exam.category_slug || "driving").toUpperCase()}`;
+      lang === "zh-CN"
+        ? "🇨🇦 CA  ›  不列颠哥伦比亚省  ›  🚗 驾驶"
+        : lang === "zh-TW"
+        ? "🇨🇦 CA  ›  不列顛哥倫比亞省  ›  🚗 駕駛"
+        : "🇨🇦 CA  ›  BRITISH COLUMBIA  ›  🚗 DRIVING";
 
     const heading = document.createElement("h2");
     heading.textContent = exam.title;
@@ -92,50 +82,39 @@ try {
     description.className = "muted";
     description.textContent = exam.description || "";
 
-    const summary = document.createElement("p");
-    summary.className = "small";
-    summary.textContent =
-      `${exam.question_count} ${labels.questionCount[lang]} · ${exam.time_limit_minutes || 30} min · ${exam.passing_score_percent}%`;
-
     const mainButtons = document.createElement("div");
-    mainButtons.className = "button-row";
+    mainButtons.className = "button-row main-action-row";
 
-mainButtons.append(
-  createLink(
-    labels.allTopics[lang],
-    `/practice.html?exam=${encodeURIComponent(exam.slug)}&lang=${encodeURIComponent(lang)}`,
-    "primary"
-  )
-);
+    const allQuestionsLink = createLink(
+      `${labels.allTopics[lang]} (${totalQuestionCount} ${labels.questionCount[lang]})`,
+      `/practice.html?exam=${encodeURIComponent(exam.slug)}&lang=${encodeURIComponent(lang)}`,
+      "primary"
+    );
+
+    mainButtons.append(allQuestionsLink);
 
     const topicHeading = document.createElement("h3");
     topicHeading.textContent = labels.topics[lang];
 
     const topicList = document.createElement("div");
-    topicList.className = "button-row";
+    topicList.className = "button-row topic-button-list";
 
-    topics
-      .sort((a, b) => a.sort_order - b.sort_order)
-      .forEach(topic => {
-        const topicName =
-          topic.topic_type === "mixed"
-            ? (topic.name || labels.mixed[lang])
-            : topic.name;
+    standardTopics.forEach(topic => {
+      const count = Number(topic.question_count || 0);
 
-        const link = createLink(
-          topicName,
-          `/practice.html?exam=${encodeURIComponent(exam.slug)}&topic=${encodeURIComponent(topic.slug)}&lang=${encodeURIComponent(lang)}`,
-          topic.topic_type === "mixed" ? "primary" : "secondary"
-        );
+      const link = createLink(
+        `${topic.name} (${count} ${labels.questionCount[lang]})`,
+        `/practice.html?exam=${encodeURIComponent(exam.slug)}&topic=${encodeURIComponent(topic.slug)}&lang=${encodeURIComponent(lang)}`,
+        "secondary topic-button"
+      );
 
-        topicList.append(link);
-      });
+      topicList.append(link);
+    });
 
     root.append(
       eyebrow,
       heading,
       description,
-      summary,
       mainButtons,
       topicHeading,
       topicList

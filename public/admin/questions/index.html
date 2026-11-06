@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Questions | Exam Practice CMS</title>
+  <link rel="stylesheet" href="/admin/css/admin.css">
+</head>
+<body class="dashboard-page">
+
+  <header class="admin-header">
+    <a class="admin-brand" href="/admin/dashboard/">
+      <span class="admin-logo">EP</span>
+      <span>Exam Practice CMS</span>
+    </a>
+    <div class="admin-header-right">
+      <span class="admin-user">Administrator</span>
+      <button id="logout-button" class="logout-button">Sign Out</button>
+    </div>
+  </header>
+
+  <div class="admin-layout">
+    <aside class="admin-sidebar">
+      <div class="sidebar-label">MAIN MENU</div>
+      <a class="sidebar-link" href="/admin/dashboard/">
+        <span>▦</span> Dashboard
+      </a>
+
+<div class="sidebar-label">CONTENT MANAGEMENT</div>
+
+<a class="sidebar-link" href="/admin/countries/">
+  <span>🌎</span> Countries
+</a>
+
+<a class="sidebar-link" href="/admin/regions/">
+  <span>📍</span> Regions
+</a>
+
+<a class="sidebar-link" href="/admin/categories/">
+  <span>📚</span> Exam Categories
+</a>
+
+<a class="sidebar-link" href="/admin/exams/">
+  <span>📝</span> Exams
+</a>
+
+<a class="sidebar-link" href="/admin/topics/">
+  <span>📂</span> Topics
+</a>
+
+<a class="sidebar-link active" href="/admin/questions/">
+  <span>❓</span> Questions
+</a>
+
+<a class="sidebar-link" href="/admin/languages/">
+  <span>🌐</span> Languages
+</a>
+</aside>
+
+    <main class="admin-main">
+      <div class="page-heading">
+        <div>
+          <h1>Questions</h1>
+          <p>Manage exam questions, translations, answers and images.</p>
+        </div>
+        <button id="add-question-button" class="primary-button">
+          + Add Question
+        </button>
+      </div>
+
+      <section class="dashboard-welcome">
+        <h2>Question Management</h2>
+        <p>
+          Create and manage multilingual exam questions.
+          Each question can contain multiple answer options and images.
+        </p>
+      </section>
+
+      <section class="module-card countries-toolbar">
+        <div>
+          <label for="exam-filter">Filter by Exam</label>
+          <select id="exam-filter">
+            <option value="">All exams</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="status-filter">Filter by Status</label>
+          <select id="status-filter">
+            <option value="">All statuses</option>
+            <option value="draft">Draft</option>
+            <option value="published">Published</option>
+            <option value="archived">Archived</option>
+          </select>
+        </div>
+
+        <div>
+          <label for="question-search">Search questions</label>
+          <input
+            type="search"
+            id="question-search"
+            placeholder="Search question text..."
+          >
+        </div>
+
+        <div id="question-count">Loading questions...</div>
+      </section>
+
+      <section class="module-card countries-table-card">
+        <div class="table-heading">
+          <h2>Question List</h2>
+          <button id="refresh-questions-button" class="secondary-button">
+            Refresh
+          </button>
+        </div>
+
+        <div class="table-responsive">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Question</th>
+                <th>Exam</th>
+                <th>Topic</th>
+                <th>Difficulty</th>
+                <th>Images</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="questions-table-body">
+              <tr>
+                <td colspan="8">Loading questions...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <p id="questions-message" class="form-message" role="status"></p>
+
+      <div id="question-modal" class="admin-modal hidden">
+        <div class="admin-modal-content exam-modal-content">
+          <div class="modal-header">
+            <div>
+              <h2 id="question-modal-title">Add Question</h2>
+              <p class="muted-text">
+                Configure question details, translations and answer options.
+              </p>
+            </div>
+            <button
+              type="button"
+              id="close-question-modal"
+              class="modal-close"
+            >×</button>
+          </div>
+
+          <form id="question-form">
+            <input type="hidden" id="question-id">
+
+            <label for="question-exam">Exam</label>
+            <select id="question-exam" required></select>
+
+            <label for="question-topic">Topic</label>
+            <select id="question-topic">
+              <option value="">No topic</option>
+            </select>
+
+            <label for="question-difficulty">Difficulty</label>
+            <select id="question-difficulty" required>
+              <option value="easy">Easy</option>
+              <option value="normal" selected>Normal</option>
+              <option value="hard">Hard</option>
+            </select>
+
+            <label for="question-status">Status</label>
+            <select id="question-status" required>
+              <option value="draft">Draft</option>
+              <option value="published">Published</option>
+              <option value="archived">Archived</option>
+            </select>
+
+            <label for="question-source-url">Explanation Source URL</label>
+            <input
+              id="question-source-url"
+              type="url"
+              placeholder="https://example.com/source"
+            >
+
+            <div class="exam-translations-heading">
+              <h3>Question Translations</h3>
+              <p class="muted-text">
+                Enter the question and explanation in each enabled language.
+              </p>
+            </div>
+
+            <div id="question-translations"></div>
+
+            <div class="exam-translations-heading">
+              <h3>Answer Options</h3>
+              <p class="muted-text">
+                Add answer choices and select the correct answer.
+              </p>
+            </div>
+
+            <div id="question-options"></div>
+
+            <button
+              type="button"
+              id="add-option-button"
+              class="secondary-button"
+            >+ Add Option</button>
+
+<div class="exam-translations-heading">
+  <h3>Question Images</h3>
+  <p class="muted-text">
+    Upload JPG, PNG or WebP images. Maximum 5MB per image.
+    You can upload up to 8 images for each question.
+  </p>
+</div>
+
+<div id="question-images"></div>
+
+<input
+  type="file"
+  id="question-image-file"
+  accept="image/jpeg,image/png,image/webp"
+  hidden
+>
+
+<button
+  type="button"
+  id="add-image-button"
+  class="secondary-button"
+>+ Upload Image</button>
+
+<p id="image-upload-message" class="admin-message" role="status"></p>
+
+            <p id="question-form-message" class="admin-message" role="alert"></p>
+
+            <div class="modal-actions">
+              <button
+                type="button"
+                id="cancel-question-button"
+                class="secondary-button"
+              >Cancel</button>
+              <button
+                type="submit"
+                id="save-question-button"
+                class="primary-button"
+              >Save Question</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <footer class="admin-footer">
+        North America Exam Practice CMS
+      </footer>
+    </main>
+  </div>
+
+  <script src="/admin/js/dashboard.js"></script>
+  <script src="/admin/js/questions.js"></script>
+</body>
+</html>

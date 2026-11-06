@@ -6,7 +6,7 @@ export const copy = {
     correctAnswer: "Correct answer", loading: "Loading…", submit: "Submit test",
     passed: "You passed!", notPassed: "Not passed yet", score: "Your score",
     noQuestions: "No questions are available in this language yet.",
-    disclaimer: "Independent practice resource. Not affiliated with or endorsed by ICBC. Sample questions are for learning purposes and are not official exam questions."
+    disclaimer: "Independent practice resource. Not affiliated with or endorsed by ICBC. Questions are for educational purposes only."
   },
   "zh-CN": {
     allExams: "所有考试", practice: "开始逐题练习", mock: "开始模拟考试",
@@ -15,7 +15,7 @@ export const copy = {
     correctAnswer: "正确答案", loading: "正在加载…", submit: "提交考试",
     passed: "恭喜，通过！", notPassed: "尚未通过", score: "你的成绩",
     noQuestions: "目前没有此语言的题目。",
-    disclaimer: "独立学习练习平台，与 ICBC 无隶属或认可关系。示例题仅供学习，并非官方考试题目。"
+    disclaimer: "独立练习平台，与 ICBC 无隶属或认可关系。题目仅供学习使用。"
   },
   "zh-TW": {
     allExams: "所有考試", practice: "開始逐題練習", mock: "開始模擬考試",
@@ -24,7 +24,7 @@ export const copy = {
     correctAnswer: "正確答案", loading: "正在載入…", submit: "提交考試",
     passed: "恭喜，通過！", notPassed: "尚未通過", score: "你的成績",
     noQuestions: "目前沒有此語言的題目。",
-    disclaimer: "獨立學習練習平台，與 ICBC 無隸屬或認可關係。示例題僅供學習，並非官方考試題目。"
+    disclaimer: "獨立練習平台，與 ICBC 無隸屬或認可關係。題目僅供學習使用。"
   }
 };
 export function getLanguage() {
