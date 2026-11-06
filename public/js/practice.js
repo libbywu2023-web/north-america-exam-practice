@@ -7,10 +7,12 @@ setLanguageSelect(lang);
 document.documentElement.lang = lang;
 
 document.querySelector("#choose-label").textContent = t.choose;
+document.querySelector("#question").textContent = t.loading;
+document.querySelector("#retry").textContent = t.retry;
+document.querySelector("#back-link").textContent = `← ${t.allExams}`;
 
 document.querySelector("#previous").textContent = t.previous;
 document.querySelector("#next").textContent = t.next;
-document.querySelector("#disclaimer").textContent = t.disclaimer;
 
 // Read URL parameters
 const params = new URLSearchParams(location.search);
@@ -21,7 +23,12 @@ let questions = [];
 
 const questionIndexKey = `practice-index:${exam}:${topic || "all"}`;
 
-let index = Number(sessionStorage.getItem(questionIndexKey) || 0);
+// All-question practice always starts from the first question.
+// Topic practice keeps its existing session progress.
+let index = topic
+  ? Number(sessionStorage.getItem(questionIndexKey) || 0)
+  : 0;
+
 if (!Number.isInteger(index) || index < 0) index = 0;
 
 // Store each question's answer and feedback.
@@ -172,7 +179,7 @@ function render() {
   }
 
   document.querySelector("#previous").disabled = index === 0;
-  document.querySelector("#next").disabled = false;
+  document.querySelector("#next").disabled = index >= questions.length - 1;
 
   submitting = false;
 }
@@ -237,12 +244,10 @@ rootOptions.addEventListener("change", async event => {
 
 
 document.querySelector("#next").addEventListener("click", () => {
-  if (index < questions.length - 1) {
-    index++;
-    render();
-  } else {
-    location.href = "/";
-  }
+  if (index >= questions.length - 1) return;
+
+  index++;
+  render();
 });
 
 document.querySelector("#previous").addEventListener("click", () => {
@@ -265,9 +270,7 @@ document.querySelector("#image-preview").addEventListener("click", event => {
 });
 // Retry the entire quiz.
 document.querySelector("#retry").addEventListener("click", () => {
-  const confirmed = confirm(
-    "Restart this practice session? All answers will be cleared."
-  );
+  const confirmed = confirm(t.confirmRetry);
 
   if (!confirmed) return;
 

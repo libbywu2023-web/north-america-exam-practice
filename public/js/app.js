@@ -25,7 +25,6 @@ const labels = {
   }
 };
 
-document.querySelector("#disclaimer").textContent = t.disclaimer;
 
 const root = document.querySelector("#exam-card");
 
@@ -103,7 +102,7 @@ try {
       const count = Number(topic.question_count || 0);
 
       const link = createLink(
-        `${topic.name} (${count} ${labels.questionCount[lang]})`,
+        `${topic.name} (${count})`,
         `/practice.html?exam=${encodeURIComponent(exam.slug)}&topic=${encodeURIComponent(topic.slug)}&lang=${encodeURIComponent(lang)}`,
         "secondary topic-button"
       );
