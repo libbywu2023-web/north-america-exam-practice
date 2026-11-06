@@ -16,10 +16,17 @@
 			"database_name": "exam-practice-db",
 			"database_id": "c66aa5ab-25fd-4d2e-8c22-d377a4095194",
 			"migrations_dir": "migrations",
-      "remote": true
+			"remote": true
 		}
 	],
 	"observability": {
 		"enabled": true
-	}
+	},
+	"r2_buckets": [
+		{
+			"bucket_name": "exam-question-images",
+			"binding": "exam_question_images",
+			"remote": true
+		}
+	]
 }

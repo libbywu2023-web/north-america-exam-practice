@@ -1,0 +1,252 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Languages | Exam Practice CMS</title>
+  <link rel="stylesheet" href="/admin/css/admin.css">
+</head>
+<body class="dashboard-page">
+
+  <header class="admin-header">
+    <a class="admin-brand" href="/admin/dashboard/">
+      <span class="admin-logo">EP</span>
+      <span>Exam Practice CMS</span>
+    </a>
+
+    <div class="admin-header-right">
+      <span class="admin-user">Administrator</span>
+      <button id="logout-button" class="logout-button">Sign Out</button>
+    </div>
+  </header>
+
+  <div class="admin-layout">
+
+    <aside class="admin-sidebar">
+      <div class="sidebar-label">MAIN MENU</div>
+
+      <a class="sidebar-link" href="/admin/dashboard/">
+        <span>▦</span> Dashboard
+      </a>
+
+      <div class="sidebar-label">CONTENT MANAGEMENT</div>
+
+      <a class="sidebar-link" href="/admin/countries/">
+        <span>🌎</span> Countries
+      </a>
+
+      <a class="sidebar-link" href="/admin/regions/">
+        <span>📍</span> Regions
+      </a>
+
+      <a class="sidebar-link" href="/admin/categories/">
+        <span>📚</span> Exam Categories
+      </a>
+
+      <a class="sidebar-link" href="/admin/exams/">
+        <span>📝</span> Exams
+      </a>
+
+      <a class="sidebar-link" href="/admin/topics/">
+        <span>📂</span> Topics
+      </a>
+
+      <a class="sidebar-link" href="/admin/questions/">
+        <span>❓</span> Questions
+      </a>
+
+      <a class="sidebar-link active" href="/admin/languages/">
+        <span>🌐</span> Languages
+      </a>
+    </aside>
+
+    <main class="admin-main">
+
+      <div class="page-heading">
+        <div>
+          <h1>Languages</h1>
+          <p>Manage languages supported by the platform.</p>
+        </div>
+
+        <button id="add-language-button" class="primary-button">
+          + Add Language
+        </button>
+      </div>
+
+      <section class="dashboard-welcome">
+        <h2>Language Management</h2>
+        <p>
+          Manage language codes, display names, native names and availability.
+          Language codes cannot be changed because translation records depend on them.
+        </p>
+      </section>
+
+      <section class="module-card countries-toolbar">
+        <div>
+          <label for="language-search">Search languages</label>
+          <input
+            type="search"
+            id="language-search"
+            placeholder="Search by code or language name..."
+          >
+        </div>
+
+        <div id="language-count">Loading languages...</div>
+      </section>
+
+      <section class="module-card countries-table-card">
+
+        <div class="table-heading">
+          <h2>Language List</h2>
+          <button id="refresh-languages-button" class="secondary-button">
+            Refresh
+          </button>
+        </div>
+
+        <div class="table-responsive">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Name</th>
+                <th>Native Name</th>
+                <th>Status</th>
+                <th>Sort Order</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+
+            <tbody id="languages-table-body">
+              <tr>
+                <td colspan="6">Loading languages...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+      </section>
+
+      <div id="language-modal" class="admin-modal" hidden>
+        <div class="admin-modal-backdrop" id="language-modal-backdrop"></div>
+
+        <div class="admin-modal-content">
+          <div class="modal-heading">
+            <div>
+              <h2 id="language-modal-title">Add Language</h2>
+              <p>Enter language information.</p>
+            </div>
+
+            <button
+              type="button"
+              id="close-language-modal"
+              class="modal-close-button"
+              aria-label="Close"
+            >×</button>
+          </div>
+
+          <form id="language-form">
+
+            <div class="form-field">
+              <label for="language-code">Language Code *</label>
+              <input
+                id="language-code"
+                name="code"
+                type="text"
+                maxlength="20"
+                placeholder="e.g. fr or zh-CN"
+                required
+              >
+              <small>
+                Use a language code such as en, fr, zh-CN or zh-TW.
+                Existing codes cannot be changed.
+              </small>
+            </div>
+
+            <div class="form-field">
+              <label for="language-name">Name *</label>
+              <input
+                id="language-name"
+                name="name"
+                type="text"
+                maxlength="100"
+                placeholder="e.g. French"
+                required
+              >
+            </div>
+
+            <div class="form-field">
+              <label for="language-native-name">Native Name *</label>
+              <input
+                id="language-native-name"
+                name="native_name"
+                type="text"
+                maxlength="100"
+                placeholder="e.g. Français"
+                required
+              >
+            </div>
+
+            <div class="form-field">
+              <label for="language-sort-order">Sort Order</label>
+              <input
+                id="language-sort-order"
+                name="sort_order"
+                type="number"
+                min="0"
+                max="10000"
+                step="1"
+                value="0"
+              >
+              <small>Smaller numbers appear first.</small>
+            </div>
+
+            <div class="form-field">
+              <label>
+                <input
+                  id="language-enabled"
+                  name="is_enabled"
+                  type="checkbox"
+                  checked
+                >
+                Enabled
+              </label>
+              <small>
+                Disabled languages are hidden from enabled-language lists.
+                Existing translations are retained.
+              </small>
+            </div>
+
+            <p id="language-form-error" class="form-message error"></p>
+
+            <div class="modal-actions">
+              <button
+                type="button"
+                id="cancel-language-button"
+                class="secondary-button"
+              >Cancel</button>
+
+              <button
+                type="submit"
+                id="save-language-button"
+                class="primary-button"
+              >Save Language</button>
+            </div>
+
+          </form>
+        </div>
+      </div>
+
+      <p id="languages-message" class="form-message" role="status"></p>
+
+      <footer class="admin-footer">
+        North America Exam Practice CMS
+      </footer>
+
+    </main>
+  </div>
+
+  <script src="/admin/js/dashboard.js"></script>
+  <script src="/admin/js/languages.js"></script>
+</body>
+</html>

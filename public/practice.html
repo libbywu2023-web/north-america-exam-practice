@@ -13,16 +13,25 @@
   <div class="progress-row"><span id="counter">Question</span><span id="topic"></span></div>
   <div class="progress"><span id="progress-fill"></span></div>
   <section class="quiz-card">
+    <div id="question-images" class="question-images" hidden aria-label="Question images"></div>
     <h1 id="question">Loading question…</h1>
     <form id="answer-form">
       <fieldset id="options"><legend id="choose-label">Choose one answer</legend></fieldset>
-      <button class="primary" id="check-button" type="submit">Check answer</button>
     </form>
     <div id="feedback" class="feedback" hidden aria-live="polite"></div>
-    <div class="nav-row"><button class="secondary" id="previous" type="button">Previous</button><button class="primary" id="next" type="button" disabled>Next</button></div>
+<div class="nav-row">
+  <button class="secondary" id="previous" type="button">Previous</button>
+  <button class="secondary" id="retry" type="button">Retry</button>
+  <button class="primary" id="next" type="button">Next</button>
+</div>
   </section>
   <p class="disclaimer" id="disclaimer">Independent practice resource. Not official ICBC questions.</p>
 </main>
+
+<dialog id="image-preview" class="image-preview">
+  <button type="button" id="image-preview-close" class="image-preview-close" aria-label="Close image">×</button>
+  <img id="image-preview-img" alt="">
+</dialog>
 <script type="module" src="/js/practice.js"></script>
 </body>
 </html>
