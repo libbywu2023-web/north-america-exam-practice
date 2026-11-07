@@ -430,3 +430,247 @@ body:has(#answer-form) .disclaimer {
   background: #fde9e9 !important;
   color: #a32323 !important;
 }
+/* ========================================
+   Homepage Exam Catalog
+======================================== */
+
+body:has(#catalog) {
+  background: #fff;
+  color: #202938;
+}
+
+body:has(#catalog) .topbar {
+  max-width: 100%;
+  min-height: 68px;
+  padding: 12px max(20px, calc((100% - 1100px) / 2));
+  background: #fff;
+  border-bottom: 1px solid #e5e7eb;
+  gap: 20px;
+}
+
+body:has(#catalog) .brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: #173b68;
+  font-size: 19px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+body:has(#catalog) .brand-icon {
+  width: 23px;
+  height: 23px;
+  flex-shrink: 0;
+}
+
+.header-tools {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  min-width: 0;
+}
+
+#catalog-search {
+  width: 220px;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid #d7dce3;
+  border-radius: 6px;
+  background: #fff;
+  color: #202938;
+  font-size: 14px;
+  outline: none;
+}
+
+#catalog-search:focus {
+  border-color: #4779b8;
+  box-shadow: 0 0 0 2px rgba(71, 121, 184, 0.12);
+}
+
+body:has(#catalog) .language-picker select {
+  height: 36px;
+  padding: 0 28px 0 10px;
+  border: 1px solid #d7dce3;
+  border-radius: 6px;
+  background: #fff;
+  color: #344054;
+  font-size: 13px;
+}
+
+body:has(#catalog) .container {
+  max-width: 1100px;
+  margin: 32px auto 48px;
+  padding: 0 24px;
+}
+
+.catalog {
+  width: 100%;
+}
+
+.catalog-country {
+  padding: 0 0 25px;
+  margin: 0 0 25px;
+  border-bottom: 1px solid #e8ebef;
+}
+
+.catalog-country:last-child {
+  border-bottom: 0;
+}
+
+.catalog-country-title {
+  margin: 0 0 17px;
+  color: #202938;
+  font-size: 21px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.catalog-region-row {
+  display: grid;
+  grid-template-columns: 145px minmax(0, 1fr);
+  align-items: center;
+  gap: 0;
+  margin: 0 0 12px;
+}
+
+.catalog-region-name {
+  color: #344054;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.6;
+}
+
+.catalog-region-exams,
+.catalog-all-exams {
+  min-width: 0;
+  color: #98a2b3;
+  font-size: 14px;
+  line-height: 1.9;
+}
+
+.catalog-all-exams {
+  margin: 0 0 12px 145px;
+}
+
+.catalog-exam-link {
+  color: #2865a5;
+  font-size: 14px;
+  font-weight: 400;
+  text-decoration: none;
+}
+
+.catalog-exam-link:hover {
+  color: #174578;
+  text-decoration: underline;
+}
+
+.catalog-empty {
+  padding: 30px 0;
+  color: #667085;
+  font-size: 14px;
+}
+
+body:has(#catalog) footer {
+  max-width: 1100px;
+  margin: 30px auto 0;
+  padding: 20px 24px 30px;
+  border-top: 1px solid #e8ebef;
+  color: #98a2b3;
+  font-size: 13px;
+  text-align: center;
+}
+
+body:has(#catalog) footer a {
+  color: #667085;
+  text-decoration: none;
+}
+
+body:has(#catalog) footer a:hover {
+  color: #2865a5;
+  text-decoration: underline;
+}
+
+/* Mobile layout */
+
+@media (max-width: 640px) {
+  body:has(#catalog) .topbar {
+    flex-wrap: wrap;
+    padding: 12px 16px;
+    gap: 12px;
+  }
+
+  body:has(#catalog) .brand {
+    font-size: 17px;
+  }
+
+  .header-tools {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  #catalog-search {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+  }
+
+  body:has(#catalog) .container {
+    margin-top: 24px;
+    padding: 0 16px;
+  }
+
+  .catalog-country {
+    padding-bottom: 20px;
+    margin-bottom: 20px;
+  }
+
+  .catalog-country-title {
+    font-size: 19px;
+    margin-bottom: 13px;
+  }
+
+  .catalog-region-row {
+    grid-template-columns: 1fr;
+    gap: 2px;
+    margin-bottom: 13px;
+  }
+
+  .catalog-region-name {
+    font-size: 14px;
+  }
+
+  .catalog-region-exams,
+  .catalog-all-exams {
+    font-size: 14px;
+  }
+
+  .catalog-all-exams {
+    margin-left: 0;
+  }
+}
+
+/* Indent regions under each country */
+
+.catalog-region-row {
+  padding-left: 28px;
+  position: relative;
+}
+
+.catalog-region-row::before {
+  content: "•";
+  position: absolute;
+  left: 10px;
+  top: 0;
+  color: #202938;
+  font-size: 16px;
+  line-height: 1.6;
+}
+.catalog-region-row {
+  padding-left: 48px;
+}
+
+.catalog-region-row::before {
+  left: 10px;
+}

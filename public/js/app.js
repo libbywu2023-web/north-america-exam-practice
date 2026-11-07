@@ -1,124 +1,213 @@
-
-import { api, copy, getLanguage, setLanguageSelect } from "./common.js";
+import {
+  api,
+  getLanguage,
+  setLanguageSelect
+} from "./common.js";
 
 const lang = getLanguage();
-const t = copy[lang];
 
 setLanguageSelect(lang);
 document.documentElement.lang = lang;
 
+const root = document.querySelector("#catalog");
+const searchInput = document.querySelector("#catalog-search");
+
 const labels = {
-  allTopics: {
-    en: "Practice all questions",
-    "zh-CN": "练习全部题目",
-    "zh-TW": "練習全部題目"
+  loading: {
+    en: "Loading exams...",
+    "zh-CN": "正在加载考试目录...",
+    "zh-TW": "正在載入考試目錄..."
   },
-  topics: {
-    en: "Practice by topic",
-    "zh-CN": "按知识点练习",
-    "zh-TW": "按知識點練習"
+  noResults: {
+    en: "No matching exams found.",
+    "zh-CN": "没有找到匹配的考试。",
+    "zh-TW": "沒有找到符合的考試。"
   },
-  questionCount: {
-    en: "questions",
-    "zh-CN": "道题",
-    "zh-TW": "道題"
+  loadError: {
+    en: "Unable to load the exam catalog. Please try again later.",
+    "zh-CN": "暂时无法加载考试目录，请稍后再试。",
+    "zh-TW": "暫時無法載入考試目錄，請稍後再試。"
   }
 };
 
+const countryFlags = {
+  CA: "🇨🇦",
+  US: "🇺🇸",
+  MX: "🇲🇽"
+};
 
-const root = document.querySelector("#exam-card");
+let allExams = [];
 
-function createLink(text, href, className) {
-  const link = document.createElement("a");
-  link.className = className;
-  link.href = href;
-  link.textContent = text;
+function createElement(tag, className, text) {
+  const element = document.createElement(tag);
+
+  if (className) {
+    element.className = className;
+  }
+
+  if (text !== undefined) {
+    element.textContent = text;
+  }
+
+  return element;
+}
+
+function createExamLink(exam) {
+  const link = createElement("a", "catalog-exam-link", exam.title);
+
+  link.href =
+    `/practice.html?exam=${encodeURIComponent(exam.slug)}` +
+    `&lang=${encodeURIComponent(lang)}`;
+
   return link;
 }
 
-try {
-  const examList = await api(
-    `/api/exams?lang=${encodeURIComponent(lang)}`
-  );
+function appendExamLinks(container, exams) {
+  exams.forEach((exam, index) => {
+    if (index > 0) {
+      container.append(
+        document.createTextNode(" · ")
+      );
+    }
 
-  const exam = examList.exams.find(
-    item => item.slug === "bc-class-7l"
-  );
+    container.append(createExamLink(exam));
+  });
+}
 
-  if (!exam) {
-    root.textContent = t.noQuestions;
-  } else {
-    const detail = await api(
-      `/api/exams/${encodeURIComponent(exam.slug)}?lang=${encodeURIComponent(lang)}`
+function getSearchText(exam) {
+  return [
+    exam.title,
+    exam.description,
+    exam.country_name,
+    exam.country_code,
+    exam.region_name,
+    exam.region_code,
+    exam.category_name,
+    exam.category_slug,
+    exam.slug
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+function renderCatalog(query = "") {
+  root.innerHTML = "";
+
+  const keyword = query.trim().toLowerCase();
+
+  const filteredExams = keyword
+    ? allExams.filter(exam =>
+        getSearchText(exam).includes(keyword)
+      )
+    : allExams;
+
+  if (filteredExams.length === 0) {
+    root.append(
+      createElement(
+        "p",
+        "catalog-empty",
+        labels.noResults[lang]
+      )
     );
+    return;
+  }
 
-    const topics = detail.topics || [];
+  const countries = new Map();
 
-    const standardTopics = topics
-      .filter(topic => topic.topic_type !== "mixed")
-      .sort((a, b) => a.sort_order - b.sort_order);
+  filteredExams.forEach(exam => {
+    if (!countries.has(exam.country_code)) {
+      countries.set(exam.country_code, {
+        code: exam.country_code,
+        name: exam.country_name,
+        regions: new Map()
+      });
+    }
 
-    const totalQuestionCount = standardTopics.reduce(
-      (total, topic) => total + Number(topic.question_count || 0),
-      0
-    );
+    const country = countries.get(exam.country_code);
 
-    root.innerHTML = "";
+    if (!country.regions.has(exam.region_code)) {
+      country.regions.set(exam.region_code, {
+        code: exam.region_code,
+        name: exam.region_name,
+        exams: []
+      });
+    }
 
-    const eyebrow = document.createElement("p");
-    eyebrow.className = "eyebrow exam-location";
-    eyebrow.textContent =
-      lang === "zh-CN"
-        ? "🇨🇦 CA  ›  不列颠哥伦比亚省  ›  🚗 驾驶"
-        : lang === "zh-TW"
-        ? "🇨🇦 CA  ›  不列顛哥倫比亞省  ›  🚗 駕駛"
-        : "🇨🇦 CA  ›  BRITISH COLUMBIA  ›  🚗 DRIVING";
+    country.regions.get(exam.region_code).exams.push(exam);
+  });
 
-    const heading = document.createElement("h2");
-    heading.textContent = exam.title;
+  countries.forEach(country => {
+    const section = createElement("section", "catalog-country");
 
-    const description = document.createElement("p");
-    description.className = "muted";
-    description.textContent = exam.description || "";
+    const heading = createElement("h2", "catalog-country-title");
 
-    const mainButtons = document.createElement("div");
-    mainButtons.className = "button-row main-action-row";
+    const flag = countryFlags[country.code] || "🌎";
 
-    const allQuestionsLink = createLink(
-      `${labels.allTopics[lang]} (${totalQuestionCount} ${labels.questionCount[lang]})`,
-      `/practice.html?exam=${encodeURIComponent(exam.slug)}&lang=${encodeURIComponent(lang)}`,
-      "primary"
-    );
+    heading.textContent = `${flag} ${country.name}`;
 
-    mainButtons.append(allQuestionsLink);
+    section.append(heading);
 
-    const topicHeading = document.createElement("h3");
-    topicHeading.textContent = labels.topics[lang];
+    const allRegion = country.regions.get("ALL");
 
-    const topicList = document.createElement("div");
-    topicList.className = "button-row topic-button-list";
-
-    standardTopics.forEach(topic => {
-      const count = Number(topic.question_count || 0);
-
-      const link = createLink(
-        `${topic.name} (${count})`,
-        `/practice.html?exam=${encodeURIComponent(exam.slug)}&topic=${encodeURIComponent(topic.slug)}&lang=${encodeURIComponent(lang)}`,
-        "secondary topic-button"
+    if (allRegion) {
+      const allExamsContainer = createElement(
+        "div",
+        "catalog-all-exams"
       );
 
-      topicList.append(link);
+      appendExamLinks(allExamsContainer, allRegion.exams);
+
+      section.append(allExamsContainer);
+    }
+
+    country.regions.forEach(region => {
+      if (region.code === "ALL") {
+        return;
+      }
+
+      const row = createElement("div", "catalog-region-row");
+
+      const regionName = createElement(
+        "div",
+        "catalog-region-name",
+        region.name
+      );
+
+      const examsContainer = createElement(
+        "div",
+        "catalog-region-exams"
+      );
+
+      appendExamLinks(examsContainer, region.exams);
+
+      row.append(regionName, examsContainer);
+      section.append(row);
     });
 
-    root.append(
-      eyebrow,
-      heading,
-      description,
-      mainButtons,
-      topicHeading,
-      topicList
-    );
-  }
-} catch (error) {
-  root.textContent = error.message;
+    root.append(section);
+  });
 }
+
+async function init() {
+  root.textContent = labels.loading[lang];
+
+  try {
+    const result = await api(
+      `/api/catalog?lang=${encodeURIComponent(lang)}`
+    );
+
+    allExams = result.exams || [];
+
+    renderCatalog();
+
+    searchInput.addEventListener("input", () => {
+      renderCatalog(searchInput.value);
+    });
+  } catch (error) {
+    console.error("Catalog loading failed:", error);
+    root.textContent = labels.loadError[lang];
+  }
+}
+
+init();

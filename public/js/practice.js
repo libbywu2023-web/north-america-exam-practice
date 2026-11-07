@@ -2,6 +2,44 @@ import { api, copy, getLanguage, setLanguageSelect } from "./common.js";
 
 const lang = getLanguage();
 const t = copy[lang];
+function updateSeo(examInfo) {
+  const title = `${examInfo.title} | Exam Practice`;
+  const description = examInfo.description ||
+    `${examInfo.title} practice questions on Exam Practice.`;
+
+  const canonicalUrl = new URL(
+  "/practice.html",
+  "https://north-america-exam-practice.libbywu2023.workers.dev"
+);
+  canonicalUrl.searchParams.set("exam", exam);
+
+  const localeMap = {
+    en: "en_CA",
+    "zh-CN": "zh_CN",
+    "zh-TW": "zh_TW"
+  };
+
+  document.title = title;
+  document.documentElement.lang = lang;
+
+  document.querySelector('meta[name="description"]')
+    ?.setAttribute("content", description);
+
+  document.querySelector("#canonical-url")
+    ?.setAttribute("href", canonicalUrl.href);
+
+  document.querySelector('meta[property="og:title"]')
+    ?.setAttribute("content", title);
+
+  document.querySelector('meta[property="og:description"]')
+    ?.setAttribute("content", description);
+
+  document.querySelector('meta[property="og:url"]')
+    ?.setAttribute("content", canonicalUrl.href);
+
+  document.querySelector('meta[property="og:locale"]')
+    ?.setAttribute("content", localeMap[lang] || "en_CA");
+}
 
 setLanguageSelect(lang);
 document.documentElement.lang = lang;
@@ -50,6 +88,18 @@ try {
   );
 
   questions = data.questions || [];
+  // Load exam information for SEO.
+try {
+  const examData = await api(
+    `/api/exams/${encodeURIComponent(exam)}?lang=${encodeURIComponent(lang)}`
+  );
+
+  if (examData.exam) {
+    updateSeo(examData.exam);
+  }
+} catch (seoError) {
+  console.warn("Failed to load exam SEO information:", seoError);
+}
 
   if (!questions.length) {
     throw new Error(t.noQuestions);
