@@ -59,19 +59,47 @@ const topic = params.get("topic");
 
 let questions = [];
 
-const questionIndexKey = `practice-index:${exam}:${topic || "all"}`;
 
-// All-question practice always starts from the first question.
-// Topic practice keeps its existing session progress.
-let index = topic
-  ? Number(sessionStorage.getItem(questionIndexKey) || 0)
-  : 0;
+const practiceStateKey = `practice-state:${exam}:${topic || "all"}`;
 
-if (!Number.isInteger(index) || index < 0) index = 0;
+// Restore practice progress and answers across language changes.
+function loadPracticeState() {
+  try {
+    const saved = JSON.parse(
+      sessionStorage.getItem(practiceStateKey) || "{}"
+    );
+
+    return {
+      index: Number.isInteger(saved.index) && saved.index >= 0
+        ? saved.index
+        : 0,
+      answers: saved.answers && typeof saved.answers === "object"
+        ? saved.answers
+        : {}
+    };
+  } catch {
+    return { index: 0, answers: {} };
+  }
+}
+
+const practiceState = loadPracticeState();
+let index = practiceState.index;
 
 // Store each question's answer and feedback.
-const answerResults = new Map();
+const answerResults = new Map(Object.entries(practiceState.answers));
+
+function savePracticeState() {
+  sessionStorage.setItem(
+    practiceStateKey,
+    JSON.stringify({
+      index,
+      answers: Object.fromEntries(answerResults)
+    })
+  );
+}
+
 let submitting = false;
+
 
 const rootOptions = document.querySelector("#options");
 
@@ -101,11 +129,43 @@ try {
   console.warn("Failed to load exam SEO information:", seoError);
 }
 
-  if (!questions.length) {
-    throw new Error(t.noQuestions);
-  }
+ if (!questions.length) {
+  throw new Error(t.noQuestions);
+}
 
-  render();
+// Restore submitted answers using the current language.
+await Promise.allSettled(
+  questions.map(async q => {
+    const savedResult = answerResults.get(String(q.id));
+
+    if (!savedResult?.submitted) return;
+
+    const result = await api(
+      `/api/questions/${q.id}/answer?lang=${encodeURIComponent(lang)}`,
+      {
+        method: "POST",
+        body: JSON.stringify({
+          option_id: Number(savedResult.selectedOptionId)
+        })
+      }
+    );
+
+    const correctOption = q.options.find(
+      option => String(option.id) === String(result.correct_option_id)
+    );
+
+    answerResults.set(String(q.id), {
+      selectedOptionId: Number(savedResult.selectedOptionId),
+      correctOptionId: result.correct_option_id,
+      submitted: true,
+      correct: result.correct,
+      correctOptionText: correctOption?.option_text || "",
+      explanation: result.explanation || ""
+    });
+  })
+);
+
+render();
 
 } catch (error) {
   document.querySelector("#question").textContent = error.message;
@@ -165,9 +225,14 @@ function renderQuestionImages(images = []) {
 
 
 function render() {
+  if (index >= questions.length) {
+    index = Math.max(0, questions.length - 1);
+  }
+
   const q = questions[index];
-  sessionStorage.setItem(questionIndexKey, String(index));
-  const savedResult = answerResults.get(q.id);
+  const savedResult = answerResults.get(String(q.id))
+    || answerResults.get(q.id);
+  const savedAnswer = savedResult?.selectedOptionId;
 
   document.querySelector("#counter").textContent =
     `${t.question} ${index + 1} / ${questions.length}`;
@@ -191,17 +256,21 @@ function render() {
     input.type = "radio";
     input.name = "answer";
     input.value = option.id;
-    input.disabled = Boolean(savedResult?.correct);
 
-    if (savedResult?.selectedOptionId === option.id) {
-      input.checked = true;
+input.disabled = false;
 
-      if (savedResult.correct) {
-        label.classList.add("answer-correct");
-      } else {
-        label.classList.add("answer-incorrect");
-      }
+if (savedAnswer === option.id) {
+  input.checked = true;
+
+  if (savedResult.submitted) {
+    if (savedResult.correct) {
+      label.classList.add("answer-correct");
+    } else {
+      label.classList.add("answer-incorrect");
     }
+  }
+}
+
 
     const span = document.createElement("span");
     span.textContent = `${option.option_key}. ${option.option_text}`;
@@ -211,7 +280,7 @@ function render() {
   });
 
   const feedback = document.querySelector("#feedback");
-  feedback.hidden = !savedResult;
+  feedback.hidden = !savedResult?.submitted;
   feedback.innerHTML = "";
 
   if (savedResult) {
@@ -231,6 +300,7 @@ function render() {
   document.querySelector("#previous").disabled = index === 0;
   document.querySelector("#next").disabled = index >= questions.length - 1;
 
+  savePracticeState();
   submitting = false;
 }
 
@@ -247,13 +317,21 @@ rootOptions.addEventListener("change", async event => {
 
   const q = questions[index];
 
-  //if (answerResults.has(q.id)) return;
+submitting = true;
 
-  submitting = true;
+// Save the selected answer before submitting.
+// This preserves the selection if the language is changed
+// while the answer request is still in progress.
+answerResults.set(String(q.id), {
+  selectedOptionId: Number(selected.value),
+  submitted: false
+});
 
-  rootOptions.querySelectorAll("input").forEach(input => {
-    input.disabled = true;
-  });
+savePracticeState();
+
+rootOptions.querySelectorAll("input").forEach(input => {
+  input.disabled = true;
+});
 
   try {
     const result = await api(
@@ -270,26 +348,32 @@ rootOptions.addEventListener("change", async event => {
       option => option.id === result.correct_option_id
     );
 
-    answerResults.set(q.id, {
-      selectedOptionId: Number(selected.value),
-      correctOptionId: result.correct_option_id,
-      correct: result.correct,
-      correctOptionText: correctOption?.option_text || "",
-      explanation: result.explanation || ""
-    });
+ answerResults.set(String(q.id), {
+  selectedOptionId: Number(selected.value),
+  correctOptionId: result.correct_option_id,
+  submitted: true,
+  correct: result.correct,
+  correctOptionText: correctOption?.option_text || "",
+  explanation: result.explanation || ""
+});
+
+savePracticeState();
 
     render();
 
   } catch (error) {
-    rootOptions.querySelectorAll("input").forEach(input => {
-      input.disabled = false;
-    });
 
-    selected.checked = true;
-    submitting = false;
+  savePracticeState();
 
-    alert(error.message);
-  }
+  rootOptions.querySelectorAll("input").forEach(input => {
+    input.disabled = false;
+  });
+
+  selected.checked = true;
+  submitting = false;
+
+  alert(error.message);
+}
 });
 
 
@@ -324,8 +408,10 @@ document.querySelector("#retry").addEventListener("click", () => {
 
   if (!confirmed) return;
 
-  answerResults.clear();
-  index = 0;
+answerResults.clear();
+index = 0;
 
-  render();
+sessionStorage.removeItem(practiceStateKey);
+
+render();
 });
