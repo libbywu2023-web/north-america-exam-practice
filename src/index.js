@@ -64,6 +64,72 @@ async function listExams(db, lang) {
   `).bind(lang).all();
   return result.results || [];
 }
+async function listCatalogExams(db, lang) {
+  const result = await db.prepare(`
+    SELECT
+      c.id AS country_id,
+      c.code AS country_code,
+      COALESCE(ct.name, c.name) AS country_name,
+
+      r.id AS region_id,
+      r.code AS region_code,
+      COALESCE(rt.name, r.name) AS region_name,
+
+      cat.slug AS category_slug,
+      COALESCE(cat_t.name, cat.name) AS category_name,
+
+      e.slug,
+      COALESCE(et.title, et_en.title) AS title,
+      COALESCE(et.description, et_en.description, '') AS description,
+
+      e.question_count,
+      e.time_limit_minutes,
+      e.passing_score_percent
+
+    FROM exams e
+
+    JOIN regions r
+      ON r.id = e.region_id
+
+    JOIN countries c
+      ON c.id = r.country_id
+
+    JOIN exam_categories cat
+      ON cat.id = e.category_id
+
+    LEFT JOIN country_translations ct
+      ON ct.country_id = c.id
+      AND ct.language_code = ?
+
+    LEFT JOIN region_translations rt
+      ON rt.region_id = r.id
+      AND rt.language_code = ?
+
+    LEFT JOIN exam_category_translations cat_t
+      ON cat_t.category_id = cat.id
+      AND cat_t.language_code = ?
+
+    LEFT JOIN exam_translations et
+      ON et.exam_id = e.id
+      AND et.language_code = ?
+
+    LEFT JOIN exam_translations et_en
+      ON et_en.exam_id = e.id
+      AND et_en.language_code = 'en'
+
+    WHERE e.status = 'published'
+      AND COALESCE(et.title, et_en.title) IS NOT NULL
+
+    ORDER BY
+      c.id,
+      CASE WHEN r.code = 'ALL' THEN 0 ELSE 1 END,
+      r.name,
+      cat.name,
+      e.id
+  `).bind(lang, lang, lang, lang).all();
+
+  return result.results || [];
+}
 
 async function getQuestionRows(db, examId, lang, topicSlug = null) {
   let topicCondition = "";
@@ -223,6 +289,11 @@ async function api(request, env) {
   if (request.method === "GET" && path === "/api/exams") {
     return json({ exams: await listExams(env.DB, lang) });
   }
+  if (request.method === "GET" && path === "/api/catalog") {
+  return json({
+    exams: await listCatalogExams(env.DB, lang)
+  });
+}
 
   const examMatch = path.match(/^\/api\/exams\/([a-z0-9-]+)$/);
   if (request.method === "GET" && examMatch) {
