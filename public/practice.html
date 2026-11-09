@@ -20,8 +20,10 @@
 <header class="topbar"><a class="brand" href="/">Exam Practice</a><select id="language" aria-label="Language"><option value="en">English</option><option value="zh-CN">简体中文</option><option value="zh-TW">繁體中文</option></select></header>
 <main class="container">
   <a class="back-link" href="/" id="back-link">← All exams</a>
-  <div class="progress-row"><span id="counter">Question</span><span id="topic"></span></div>
-  <div class="progress"><span id="progress-fill"></span></div>
+<div class="progress-row">
+  <span id="counter">Completed 0/0</span>
+</div>
+<div id="question-navigator" class="question-navigator" aria-label="Question navigation"></div>
   <section class="quiz-card">
     <div id="question-images" class="question-images" hidden aria-label="Question images"></div>
     <h1 id="question">Loading question…</h1>
