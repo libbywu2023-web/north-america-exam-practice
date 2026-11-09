@@ -100,7 +100,9 @@ function savePracticeState() {
 
 let submitting = false;
 
-
+// Question navigator state.
+let navStart = 0;
+const navContainer = document.querySelector("#question-navigator");
 const rootOptions = document.querySelector("#options");
 
 // Build API URL
@@ -171,8 +173,7 @@ render();
   document.querySelector("#question").textContent = error.message;
   document.querySelector("#answer-form").hidden = true;
   document.querySelector("#counter").textContent = "";
-  document.querySelector("#topic").textContent = "";
-  document.querySelector("#progress-fill").style.width = "0%";
+  navContainer.replaceChildren();
 }
 
 function renderQuestionImages(images = []) {
@@ -222,7 +223,100 @@ function renderQuestionImages(images = []) {
   container.hidden = container.children.length === 0;
 }
 
+function renderQuestionNavigator(followCurrent = true) {
+  const completedCount = questions.filter(q => {
+    const result = answerResults.get(String(q.id))
+      || answerResults.get(q.id);
+    return result?.submitted === true;
+  }).length;
 
+  document.querySelector("#counter").textContent =
+    `${t.completed} ${completedCount}/${questions.length}`;
+
+  navContainer.replaceChildren();
+
+  if (!questions.length) return;
+
+  const isMobile = window.matchMedia("(max-width: 600px)").matches;
+  const availableWidth =
+    navContainer.clientWidth || navContainer.parentElement.clientWidth || 360;
+
+  const visibleCount = isMobile
+    ? 11
+    : Math.max(11, Math.floor((availableWidth - 76) / 33));
+
+  const maxStart = Math.max(0, questions.length - visibleCount);
+
+  // Keep the current question visible when navigating questions.
+  if (followCurrent) {
+    if (index < navStart) {
+      navStart = index;
+    } else if (index >= navStart + visibleCount) {
+      navStart = index - visibleCount + 1;
+    }
+  }
+
+  navStart = Math.min(navStart, maxStart);
+
+  const previousButton = document.createElement("button");
+  previousButton.type = "button";
+  previousButton.className = "question-nav-arrow";
+  previousButton.textContent = "‹";
+  previousButton.setAttribute("aria-label", "Previous questions");
+  previousButton.disabled = navStart === 0;
+  previousButton.addEventListener("click", () => {
+    navStart = Math.max(0, navStart - visibleCount);
+    renderQuestionNavigator(false);
+  });
+
+  const windowElement = document.createElement("div");
+  windowElement.className = "question-nav-window";
+
+  const end = Math.min(questions.length, navStart + visibleCount);
+
+  for (let i = navStart; i < end; i++) {
+    const q = questions[i];
+    const result = answerResults.get(String(q.id))
+      || answerResults.get(q.id);
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "question-nav-item";
+    button.textContent = String(i + 1);
+
+    if (result?.submitted) {
+      button.classList.add(
+        result.correct ? "is-correct" : "is-incorrect"
+      );
+    }
+
+    if (i === index) {
+      button.classList.add("is-current");
+      button.setAttribute("aria-current", "step");
+    }
+
+    button.setAttribute("aria-label", `Question ${i + 1}`);
+    button.addEventListener("click", () => {
+      index = i;
+      render();
+    });
+
+    windowElement.append(button);
+  }
+
+  const nextButton = document.createElement("button");
+  nextButton.type = "button";
+  nextButton.className = "question-nav-arrow";
+  nextButton.textContent = "›";
+  nextButton.setAttribute("aria-label", "Next questions");
+  nextButton.disabled = navStart >= maxStart;
+  nextButton.addEventListener("click", () => {
+    navStart = Math.min(maxStart, navStart + visibleCount);
+    renderQuestionNavigator(false);
+  });
+
+  navContainer.append(previousButton, windowElement, nextButton);
+}
 
 function render() {
   if (index >= questions.length) {
@@ -234,13 +328,7 @@ function render() {
     || answerResults.get(q.id);
   const savedAnswer = savedResult?.selectedOptionId;
 
-  document.querySelector("#counter").textContent =
-    `${t.question} ${index + 1} / ${questions.length}`;
-
-  document.querySelector("#topic").textContent = q.topic;
-
-  const progress = ((index + 1) / questions.length) * 100;
-  document.querySelector("#progress-fill").style.width = `${progress}%`;
+  renderQuestionNavigator();
 
   renderQuestionImages(q.images || []);
 
@@ -314,14 +402,11 @@ rootOptions.addEventListener("change", async event => {
     !selected.matches('input[name="answer"]') ||
     submitting
   ) return;
-
   const q = questions[index];
+  const previousResult = answerResults.get(String(q.id))
+    || answerResults.get(q.id);
+  submitting = true;
 
-submitting = true;
-
-// Save the selected answer before submitting.
-// This preserves the selection if the language is changed
-// while the answer request is still in progress.
 answerResults.set(String(q.id), {
   selectedOptionId: Number(selected.value),
   submitted: false
@@ -363,14 +448,14 @@ savePracticeState();
 
   } catch (error) {
 
+  if (previousResult) {
+    answerResults.set(String(q.id), previousResult);
+  } else {
+    answerResults.delete(String(q.id));
+  }
+
   savePracticeState();
-
-  rootOptions.querySelectorAll("input").forEach(input => {
-    input.disabled = false;
-  });
-
-  selected.checked = true;
-  submitting = false;
+  render();
 
   alert(error.message);
 }
@@ -410,6 +495,7 @@ document.querySelector("#retry").addEventListener("click", () => {
 
 answerResults.clear();
 index = 0;
+navStart = 0;
 
 sessionStorage.removeItem(practiceStateKey);
 
