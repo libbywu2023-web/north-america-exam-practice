@@ -100,7 +100,7 @@ function renderQuestions() {
 
   const filtered = questions.filter(question => {
     if (selectedExam &&
-        String(question.exam_id) !== selectedExam) return false;
+      String(question.exam_id) !== selectedExam) return false;
 
     if (selectedStatus && question.status !== selectedStatus) return false;
 
@@ -199,15 +199,29 @@ function renderQuestionTranslations(translations = {}) {
     const name = escapeHTML(language.native_name || language.name);
     const existing = translations[language.code] || {};
 
+    const isEnglish = language.code === "en";
+
+    const questionSource = existing.question_text_source || "manual";
+    const explanationSource = existing.explanation_source || "manual";
+
     return `
       <section class="exam-language-section">
         <h4>${name} <span class="muted-text">(${code})</span></h4>
 
-        <label for="question-text-${code}">Question</label>
+        <label for="question-text-${code}">
+          Question
+          <span class="muted-text">
+            (${isEnglish ? "Required" : "Optional"})
+          </span>
+          <span class="muted-text">· ${escapeHTML(questionSource)}</span>
+        </label>
         <textarea id="question-text-${code}" rows="3"
-          required>${escapeHTML(existing.question_text || "")}</textarea>
+          ${isEnglish ? "required" : ""}>${escapeHTML(existing.question_text || "")}</textarea>
 
-        <label for="question-explanation-${code}">Explanation</label>
+        <label for="question-explanation-${code}">
+          Explanation
+          <span class="muted-text">· ${escapeHTML(explanationSource)}</span>
+        </label>
         <textarea id="question-explanation-${code}" rows="3"
           >${escapeHTML(existing.explanation || "")}</textarea>
       </section>
@@ -247,18 +261,30 @@ function createOptionHTML(option = {}, index = 0) {
         Correct answer
       </label>
 
-      ${languages.map(language => {
-        const code = escapeHTML(language.code);
-        const name = escapeHTML(language.native_name || language.name);
-        const value = option.translations?.[language.code] || "";
+${languages.map(language => {
+    const code = escapeHTML(language.code);
+    const name = escapeHTML(language.native_name || language.name);
 
-        return `
-          <label>Option text - ${name} (${code})</label>
-          <input type="text" class="option-translation"
-            data-language="${code}"
-            value="${escapeHTML(value)}" required>
-        `;
-      }).join("")}
+    const translation = option.translations?.[language.code] || {};
+    const value = translation.option_text || "";
+    const source = translation.translation_source || "manual";
+
+    const isEnglish = language.code === "en";
+
+    return `
+    <label>
+      Option text - ${name} (${code})
+      <span class="muted-text">
+        ${isEnglish ? "Required" : "Optional"}
+      </span>
+      <span class="muted-text">· ${escapeHTML(source)}</span>
+    </label>
+    <input type="text" class="option-translation"
+      data-language="${code}"
+      value="${escapeHTML(value)}"
+      ${isEnglish ? "required" : ""}>
+  `;
+  }).join("")}
     </section>
   `;
 }
