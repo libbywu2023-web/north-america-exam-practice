@@ -1,4 +1,5 @@
 import { isAdminAuthenticated } from "./admin-auth.js";
+import { translateTexts } from "./services/translation.js";
 
 const API_PATH = "/api/admin/questions";
 
@@ -22,6 +23,7 @@ async function getEnabledLanguages(env) {
 
   return result.results || [];
 }
+
 
 function validateQuestion(body, languages) {
   const examId = Number(body.exam_id);
@@ -58,39 +60,82 @@ function validateQuestion(body, languages) {
     return { error: "Question translations are required." };
   }
 
+  // English must be an enabled language.
+  if (!languages.some(language => language.code === "en")) {
+    return { error: "English (en) must be an enabled language." };
+  }
+
+  // English question text is required.
+  const englishTranslation = body.translations.en;
+
+  if (
+    !englishTranslation ||
+    typeof englishTranslation.question_text !== "string" ||
+    !englishTranslation.question_text.trim()
+  ) {
+    return { error: "Please enter the question in English." };
+  }
+
+  // Normalize all enabled language fields.
+  // Non-English translations and explanations may be empty.
+  const normalizedTranslations = {};
+
   for (const language of languages) {
-    const translation = body.translations[language.code];
+    const translation = body.translations[language.code] || {};
 
     if (
-      !translation ||
-      typeof translation.question_text !== "string" ||
-      !translation.question_text.trim()
+      typeof translation !== "object" ||
+      Array.isArray(translation)
     ) {
       return {
-        error: `Please enter the question in ${language.native_name}.`
+        error: `Invalid translation in ${language.native_name}.`
       };
     }
 
     if (
+      translation.question_text !== undefined &&
+      typeof translation.question_text !== "string"
+    ) {
+      return {
+        error: `Invalid question text in ${language.native_name}.`
+      };
+    }
+
+    if (
+      translation.explanation !== undefined &&
       typeof translation.explanation !== "string"
     ) {
       return {
-        error: `Please enter a valid explanation in ${language.native_name}.`
+        error: `Invalid explanation in ${language.native_name}.`
       };
     }
+
+    normalizedTranslations[language.code] = {
+      question_text: translation.question_text?.trim() || "",
+      explanation: translation.explanation?.trim() || ""
+    };
   }
 
-  if (!Array.isArray(body.options) || body.options.length < 2 || body.options.length > 8) {
+  if (
+    !Array.isArray(body.options) ||
+    body.options.length < 2 ||
+    body.options.length > 8
+  ) {
     return { error: "A question must have between 2 and 8 options." };
   }
 
   const keys = new Set();
   let correctCount = 0;
+  const normalizedOptions = [];
 
   for (let index = 0; index < body.options.length; index++) {
     const option = body.options[index];
 
-    if (!option || typeof option !== "object") {
+    if (
+      !option ||
+      typeof option !== "object" ||
+      Array.isArray(option)
+    ) {
       return { error: "Invalid question option." };
     }
 
@@ -108,20 +153,47 @@ function validateQuestion(body, languages) {
 
     if (
       !option.translations ||
-      typeof option.translations !== "object"
+      typeof option.translations !== "object" ||
+      Array.isArray(option.translations)
     ) {
-      return { error: `Please provide translations for option ${key}.` };
+      return {
+        error: `Please provide translations for option ${key}.`
+      };
     }
+
+    const englishOption = option.translations.en;
+
+    if (
+      typeof englishOption !== "string" ||
+      !englishOption.trim()
+    ) {
+      return {
+        error: `Please enter option ${key} in English.`
+      };
+    }
+
+    const normalizedOptionTranslations = {};
 
     for (const language of languages) {
       const text = option.translations[language.code];
 
-      if (typeof text !== "string" || !text.trim()) {
+      if (text !== undefined && typeof text !== "string") {
         return {
-          error: `Please enter option ${key} in ${language.native_name}.`
+          error: `Invalid option ${key} in ${language.native_name}.`
         };
       }
+
+      normalizedOptionTranslations[language.code] =
+        typeof text === "string" ? text.trim() : "";
     }
+
+    normalizedOptions.push({
+      optionKey: key,
+      sortOrder: index + 1,
+      isCorrect:
+        option.is_correct === true || option.is_correct === 1 ? 1 : 0,
+      translations: normalizedOptionTranslations
+    });
   }
 
   if (correctCount !== 1) {
@@ -146,18 +218,282 @@ function validateQuestion(body, languages) {
       difficulty: body.difficulty,
       status: body.status,
       sourceUrl,
-      translations: body.translations,
-      options: body.options.map((option, index) => ({
-        optionKey: String(option.option_key).trim().toUpperCase(),
-        sortOrder: index + 1,
-        isCorrect:
-          option.is_correct === true || option.is_correct === 1 ? 1 : 0,
-        translations: option.translations
-      }))
+      translations: normalizedTranslations,
+      options: normalizedOptions
     }
   };
 }
 
+function getTranslationValue(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+async function prepareQuestionTranslations(
+  questionId,
+  values,
+  languages,
+  env
+) {
+  // 读取数据库中已有的题干和解释翻译
+  const existingResult = questionId
+    ? await env.DB.prepare(`
+        SELECT *
+        FROM question_translations
+        WHERE question_id = ?
+      `).bind(questionId).all()
+    : { results: [] };
+
+  const existingMap = new Map(
+    (existingResult.results || []).map(row => [
+      row.language_code,
+      row
+    ])
+  );
+
+  const prepared = {};
+  const warnings = [];
+
+  const english = values.translations.en;
+  const existingEnglish = existingMap.get("en");
+
+  for (const language of languages) {
+    const code = language.code;
+    const submitted = values.translations[code] || {};
+    const existing = existingMap.get(code);
+
+    if (code === "en") {
+      prepared.en = {
+        question_text: english.question_text,
+        explanation: english.explanation,
+        question_text_source: "manual",
+        explanation_source: "manual"
+      };
+      continue;
+    }
+
+    const fields = [
+      {
+        name: "question_text",
+        sourceName: "question_text_source",
+        englishText: english.question_text
+      },
+      {
+        name: "explanation",
+        sourceName: "explanation_source",
+        englishText: english.explanation
+      }
+    ];
+
+    prepared[code] = {};
+
+    for (const field of fields) {
+      const submittedText = getTranslationValue(submitted[field.name]);
+      const oldText = getTranslationValue(existing?.[field.name]);
+      const oldSource = existing?.[field.sourceName] || "manual";
+
+      let finalText = submittedText;
+      let finalSource = oldSource;
+
+      const manuallyEdited =
+        oldSource === "machine" &&
+        submittedText &&
+        submittedText !== oldText;
+
+      const englishChanged =
+        !existingEnglish ||
+        getTranslationValue(existingEnglish[field.name]) !==
+        getTranslationValue(field.englishText);
+
+      const manualTranslationCleared =
+        oldSource === "manual" &&
+        !!oldText &&
+        !submittedText;
+
+      const shouldTranslate =
+        !submittedText ||
+        (
+          oldSource === "machine" &&
+          !manuallyEdited &&
+          submittedText === oldText &&
+          englishChanged
+        );
+
+      if (manuallyEdited) {
+        finalSource = "manual";
+      } else if (!shouldTranslate) {
+        finalSource = oldSource;
+      } else {
+        try {
+          const translated = await translateTexts(
+            [field.englishText],
+            code,
+            env
+          );
+
+          finalText = translated[0];
+          finalSource = "machine";
+        } catch (error) {
+          warnings.push({
+            language: code,
+            field: field.name,
+            message: "Automatic translation failed."
+          });
+
+          if (manualTranslationCleared) {
+            // 管理员清空了人工翻译，失败时不恢复旧内容
+            finalText = "";
+            finalSource = "machine";
+          } else {
+            // 其他情况保留当前提交内容或已有翻译
+            finalText = submittedText || oldText || "";
+            finalSource = existing ? oldSource : "machine";
+          }
+        }
+      }
+
+      prepared[code][field.name] = finalText || "";
+      prepared[code][field.sourceName] = finalSource;
+    }
+  }
+
+  return {
+    translations: prepared,
+    warnings
+  };
+}
+
+async function prepareOptionTranslations(
+  questionId,
+  values,
+  languages,
+  env
+) {
+  // 读取现有选项及其翻译
+  const existingOptionsResult = questionId
+    ? await env.DB.prepare(`
+        SELECT
+          qo.option_key,
+          ot.language_code,
+          ot.option_text,
+          ot.translation_source
+        FROM question_options qo
+        LEFT JOIN option_translations ot
+          ON ot.option_id = qo.id
+        WHERE qo.question_id = ?
+      `).bind(questionId).all()
+    : { results: [] };
+
+  const existingMap = new Map();
+
+  for (const row of existingOptionsResult.results || []) {
+    if (!existingMap.has(row.option_key)) {
+      existingMap.set(row.option_key, {});
+    }
+
+    if (row.language_code) {
+      existingMap.get(row.option_key)[row.language_code] = row;
+    }
+  }
+
+  const prepared = {};
+  const warnings = [];
+
+  for (const option of values.options) {
+    prepared[option.optionKey] = {};
+
+    const englishText = option.translations.en;
+
+    for (const language of languages) {
+      const code = language.code;
+
+      if (code === "en") {
+        prepared[option.optionKey][code] = {
+          option_text: englishText,
+          translation_source: "manual"
+        };
+        continue;
+      }
+
+      const submittedText = getTranslationValue(
+        option.translations[code]
+      );
+
+      const existing = existingMap.get(option.optionKey)?.[code];
+      const oldText = getTranslationValue(existing?.option_text);
+      const oldSource = existing?.translation_source || "manual";
+
+      const manuallyEdited =
+        oldSource === "machine" &&
+        submittedText &&
+        submittedText !== oldText;
+
+      const existingEnglish = existingMap.get(option.optionKey)?.en;
+
+      const englishChanged =
+        !existingEnglish ||
+        getTranslationValue(existingEnglish.option_text) !==
+        getTranslationValue(englishText);
+
+      const manualTranslationCleared =
+        oldSource === "manual" &&
+        !!oldText &&
+        !submittedText;
+
+      const shouldTranslate =
+        !submittedText ||
+        (
+          oldSource === "machine" &&
+          !manuallyEdited &&
+          submittedText === oldText &&
+          englishChanged
+        );
+
+      let finalText = submittedText;
+      let finalSource = oldSource;
+
+      if (manuallyEdited) {
+        finalSource = "manual";
+      } else if (!shouldTranslate) {
+        finalSource = oldSource;
+      } else {
+        try {
+          const translated = await translateTexts(
+            [englishText],
+            code,
+            env
+          );
+
+          finalText = translated[0];
+          finalSource = "machine";
+        } catch (error) {
+          warnings.push({
+            option: option.optionKey,
+            language: code,
+            message: "Automatic translation failed."
+          });
+
+          if (manualTranslationCleared) {
+            finalText = "";
+            finalSource = "machine";
+          } else {
+            finalText = submittedText || oldText || "";
+            finalSource = existing ? oldSource : "machine";
+          }
+        }
+      }
+
+      prepared[option.optionKey][code] = {
+        option_text: finalText || "",
+        translation_source: finalSource
+      };
+    }
+  }
+
+  return {
+    translations: prepared,
+    warnings
+  };
+}
 async function validateRelations(env, examId, topicId) {
   const exam = await env.DB.prepare(`
     SELECT id
@@ -232,8 +568,14 @@ async function listQuestions(env) {
     `).all(),
 
     env.DB.prepare(`
-      SELECT question_id, language_code, question_text, explanation
-      FROM question_translations
+SELECT
+  question_id,
+  language_code,
+  question_text,
+  explanation,
+  question_text_source,
+  explanation_source
+FROM question_translations
     `).all(),
 
     env.DB.prepare(`
@@ -243,8 +585,12 @@ async function listQuestions(env) {
     `).all(),
 
     env.DB.prepare(`
-      SELECT option_id, language_code, option_text
-      FROM option_translations
+     SELECT
+  option_id,
+  language_code,
+  option_text,
+  translation_source
+FROM option_translations
     `).all(),
 
     getEnabledLanguages(env),
@@ -268,7 +614,7 @@ async function listQuestions(env) {
     `).all()
   ]);
 
-    const imagesByQuestion = {};
+  const imagesByQuestion = {};
 
   for (const row of imageResult.results || []) {
     imagesByQuestion[row.question_id] ||= [];
@@ -284,14 +630,19 @@ async function listQuestions(env) {
     questionTranslations[row.question_id] ||= {};
     questionTranslations[row.question_id][row.language_code] = {
       question_text: row.question_text,
-      explanation: row.explanation
+      explanation: row.explanation,
+      question_text_source: row.question_text_source,
+      explanation_source: row.explanation_source
     };
   }
 
   const optionTranslations = {};
   for (const row of optionTranslationResult.results || []) {
     optionTranslations[row.option_id] ||= {};
-    optionTranslations[row.option_id][row.language_code] = row.option_text;
+    optionTranslations[row.option_id][row.language_code] = {
+      option_text: row.option_text,
+      translation_source: row.translation_source
+    };
   }
 
   const optionsByQuestion = {};
@@ -403,17 +754,35 @@ async function saveQuestion(id, request, env) {
       ).run();
     }
 
+
+    // Prepare question and option translations
+    const questionTranslationResult =
+      await prepareQuestionTranslations(
+        questionId,
+        values,
+        languages,
+        env
+      );
+
+    const optionTranslationResult =
+      await prepareOptionTranslations(
+        questionId,
+        values,
+        languages,
+        env
+      );
+
+    const translationWarnings = [
+      ...questionTranslationResult.warnings,
+      ...optionTranslationResult.warnings
+    ];
+
     const statements = [];
 
-    statements.push(
-      env.DB.prepare(`
-        DELETE FROM question_translations
-        WHERE question_id = ?
-      `).bind(questionId)
-    );
-
+    // Save question translations without deleting existing records
     for (const language of languages) {
-      const translation = values.translations[language.code];
+      const translation =
+        questionTranslationResult.translations[language.code];
 
       statements.push(
         env.DB.prepare(`
@@ -421,14 +790,24 @@ async function saveQuestion(id, request, env) {
             question_id,
             language_code,
             question_text,
-            explanation
+            explanation,
+            question_text_source,
+            explanation_source
           )
-          VALUES (?, ?, ?, ?)
+          VALUES (?, ?, ?, ?, ?, ?)
+          ON CONFLICT(question_id, language_code)
+          DO UPDATE SET
+            question_text = excluded.question_text,
+            explanation = excluded.explanation,
+            question_text_source = excluded.question_text_source,
+            explanation_source = excluded.explanation_source
         `).bind(
           questionId,
           language.code,
-          translation.question_text.trim(),
-          translation.explanation.trim()
+          translation.question_text,
+          translation.explanation,
+          translation.question_text_source,
+          translation.explanation_source
         )
       );
     }
@@ -483,26 +862,29 @@ async function saveQuestion(id, request, env) {
           )
         );
 
-        statements.push(
-          env.DB.prepare(`
-            DELETE FROM option_translations
-            WHERE option_id = ?
-          `).bind(existing.id)
-        );
-
+        // Save existing option translations using UPSERT
         for (const language of languages) {
+          const translation =
+            optionTranslationResult.translations[option.optionKey][language.code];
+
           statements.push(
             env.DB.prepare(`
               INSERT INTO option_translations (
                 option_id,
                 language_code,
-                option_text
+                option_text,
+                translation_source
               )
-              VALUES (?, ?, ?)
+              VALUES (?, ?, ?, ?)
+              ON CONFLICT(option_id, language_code)
+              DO UPDATE SET
+                option_text = excluded.option_text,
+                translation_source = excluded.translation_source
             `).bind(
               existing.id,
               language.code,
-              option.translations[language.code].trim()
+              translation.option_text,
+              translation.translation_source
             )
           );
         }
@@ -524,20 +906,30 @@ async function saveQuestion(id, request, env) {
           )
         );
 
+        // Save new option translations using UPSERT
         for (const language of languages) {
+          const translation =
+            optionTranslationResult.translations[option.optionKey][language.code];
+
           statements.push(
             env.DB.prepare(`
               INSERT INTO option_translations (
                 option_id,
                 language_code,
-                option_text
+                option_text,
+                translation_source
               )
-              SELECT id, ?, ?
+              SELECT id, ?, ?, ?
               FROM question_options
               WHERE question_id = ? AND option_key = ?
+              ON CONFLICT(option_id, language_code)
+              DO UPDATE SET
+                option_text = excluded.option_text,
+                translation_source = excluded.translation_source
             `).bind(
               language.code,
-              option.translations[language.code].trim(),
+              translation.option_text,
+              translation.translation_source,
               questionId,
               option.optionKey
             )
@@ -546,7 +938,7 @@ async function saveQuestion(id, request, env) {
       }
     }
 
-        // Save question images
+    // Save question images
     statements.push(
       env.DB.prepare(`
         DELETE FROM question_images
@@ -607,7 +999,8 @@ async function saveQuestion(id, request, env) {
       id: questionId,
       message: id === null
         ? "Question created successfully."
-        : "Question updated successfully."
+        : "Question updated successfully.",
+      translationWarnings
     }, id === null ? 201 : 200);
   } catch (error) {
     console.error("Save question error:", error);
@@ -616,7 +1009,7 @@ async function saveQuestion(id, request, env) {
       await env.DB.prepare(`
         DELETE FROM questions
         WHERE id = ?
-      `).bind(questionId).run().catch(() => {});
+      `).bind(questionId).run().catch(() => { });
     }
 
     return jsonResponse({
