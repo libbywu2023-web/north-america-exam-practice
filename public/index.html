@@ -3,74 +3,124 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta
-    name="description"
-    content="Practice exam questions for driving tests, citizenship tests, and professional exams across North America."
-  >
-  <title>Exam Practice</title>
+<meta name="description" content="Free online practice tests for standardized exams worldwide. Explore exam preparation resources by country and region.">
+  <title>Global Exam Practice</title>
   <link rel="stylesheet" href="/css/style.css">
 </head>
-<body>
-  <header class="topbar">
-    <a class="brand" href="/">
-      <svg class="brand-icon" viewBox="0 0 24 24" aria-hidden="true">
-        <path
-          d="M4 5.5A2.5 2.5 0 0 1 6.5 3H20v16H6.5A2.5 2.5 0 0 0 4 21.5z"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.8"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-        />
-        <path
-          d="M4 5.5v16M8 7h8M8 11h8"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.8"
-          stroke-linecap="round"
-        />
-      </svg>
-      <span>Exam Practice</span>
-    </a>
+<body class="homepage">
 
-    <div class="header-tools">
-      <input
-        id="catalog-search"
-        type="search"
-        placeholder="Search exams..."
-        aria-label="Search exams"
-        autocomplete="off"
-      >
+<header class="topbar site-header">
+  <a
+    class="brand"
+    href="/"
+    aria-label="Global Exam Practice Home"
+    data-i18n-aria="brandHome"
+  >
+    <svg class="brand-icon" viewBox="0 0 48 48" aria-hidden="true">
+      <path d="M3 17 24 7l21 10-21 10L3 17Z" fill="#1769c2"/>
+      <path d="M12 22v10c7 7 17 7 24 0V22l-12 7-12-7Z" fill="#123765"/>
+      <path d="M44 18v13" stroke="#e6a52e" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="44" cy="33" r="2.5" fill="#e6a52e"/>
+    </svg>
+    <span>Global Exam Practice</span>
+  </a>
 
-      <label class="language-picker">
-        <span class="sr-only">Language</span>
-        <select id="language">
-          <option value="en">English</option>
-          <option value="zh-CN">简体中文</option>
-          <option value="zh-TW">繁體中文</option>
-        </select>
-      </label>
-    </div>
-  </header>
+  <label class="language-picker">
+    <span class="sr-only">Language</span>
+    <select id="language">
+      <option value="en">English</option>
+      <option value="zh-CN">简体中文</option>
+      <option value="zh-TW">繁體中文</option>
+    </select>
+  </label>
+</header>
+  <main class="homepage-main">
+    <section class="home-hero">
+      <div class="hero-inner">
+       <div class="hero-content">
+  <h1 data-i18n="heroTitle">Free Online Practice Tests for Exams Worldwide</h1>
 
-  <main class="container">
-    <section
-      id="catalog"
-      class="catalog"
-      aria-live="polite"
-    >
-      <p class="muted">Loading exams...</p>
+  <p class="hero-slogan" data-i18n="heroSlogan">Practice. Prepare. Succeed.</p>
+
+  <p class="hero-description" data-i18n="heroDescription">
+    Prepare for your next exam with free online practice questions.
+    Explore driving, licensing, and other exam preparation resources
+    by country and region.
+  </p>
+          <form class="hero-search" id="catalog-search-form" role="search">
+            <span class="search-icon" aria-hidden="true">
+  <svg viewBox="0 0 24 24" width="21" height="21" fill="none"
+       stroke="currentColor" stroke-width="2" stroke-linecap="round">
+    <circle cx="11" cy="11" r="7"></circle>
+    <path d="m16 16 4 4"></path>
+  </svg>
+</span>
+           <input
+  id="catalog-search"
+  type="search"
+  placeholder="Search for exams..."
+  aria-label="Search exams"
+  data-i18n-placeholder="searchPlaceholder"
+  data-i18n-aria="searchAria"
+  autocomplete="off"
+>
+            <button type="submit" data-i18n="searchButton">Search</button>
+          </form>
+        </div>
+
+
+<div class="hero-illustration" aria-hidden="true">
+  <img
+    src="/images/globe-graduation.png"
+    alt=""
+    class="hero-illustration-image"
+    fetchpriority="high"
+  />
+</div>
+
+      </div>
+
+      <section id="catalog" class="catalog" aria-live="polite">
+        <p class="muted">Loading exams...</p>
+      </section>
     </section>
   </main>
 
-  <footer>
-    <a href="/about.html">About</a>
-    ·
-    <a href="/privacy.html">Privacy</a>
-    ·
-    <a href="/contact.html">Contact</a>
-  </footer>
-
   <script type="module" src="/js/app.js"></script>
+
+
+<footer class="site-footer">
+  <div class="footer-inner">
+   <div class="footer-brand">
+  <a href="/" class="footer-logo">Global Exam Practice</a>
+  <p data-i18n="heroSlogan">Practice. Prepare. Succeed.</p>
+  <p class="footer-description" data-i18n="footerDescription">
+    Free online practice tests for standardized exams worldwide.
+    Practice at your own pace and prepare with confidence.
+  </p>
+</div>
+
+<nav class="footer-links" aria-label="Information" data-i18n-aria="footerNav">
+  <a href="/about.html" data-i18n="about">About</a>
+  <a href="/privacy.html" data-i18n="privacy">Privacy Policy</a>
+  <a href="/contact.html" data-i18n="contact">Contact</a>
+</nav>
+
+<div class="footer-legal">
+  <p class="footer-disclaimer" data-i18n="disclaimer">
+    Global Exam Practice is an independent educational resource
+    and is not affiliated with any government agency or examination authority.
+  </p>
+</div>
+  </div>
+
+  <div class="footer-bottom">
+<p class="footer-copyright" data-i18n="copyright">
+  © 2026 Global Exam Practice. All rights reserved.
+</p>
+  </div>
+</footer>
+
+
 </body>
 </html>
