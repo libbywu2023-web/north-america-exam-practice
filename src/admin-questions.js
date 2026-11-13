@@ -264,9 +264,9 @@ async function prepareQuestionTranslations(
     if (code === "en") {
       prepared.en = {
         question_text: english.question_text,
-        explanation: english.explanation,
+        explanation: existing?.explanation || "",
         question_text_source: "manual",
-        explanation_source: "manual"
+        explanation_source: existing?.explanation_source || "manual"
       };
       continue;
     }
@@ -276,11 +276,6 @@ async function prepareQuestionTranslations(
         name: "question_text",
         sourceName: "question_text_source",
         englishText: english.question_text
-      },
-      {
-        name: "explanation",
-        sourceName: "explanation_source",
-        englishText: english.explanation
       }
     ];
 
@@ -786,28 +781,24 @@ async function saveQuestion(id, request, env) {
 
       statements.push(
         env.DB.prepare(`
-          INSERT INTO question_translations (
-            question_id,
-            language_code,
-            question_text,
-            explanation,
-            question_text_source,
-            explanation_source
-          )
-          VALUES (?, ?, ?, ?, ?, ?)
-          ON CONFLICT(question_id, language_code)
-          DO UPDATE SET
-            question_text = excluded.question_text,
-            explanation = excluded.explanation,
-            question_text_source = excluded.question_text_source,
-            explanation_source = excluded.explanation_source
-        `).bind(
+    INSERT INTO question_translations (
+      question_id,
+      language_code,
+      question_text,
+      explanation,
+      question_text_source,
+      explanation_source
+    )
+    VALUES (?, ?, ?, '', ?, 'manual')
+    ON CONFLICT(question_id, language_code)
+    DO UPDATE SET
+      question_text = excluded.question_text,
+      question_text_source = excluded.question_text_source
+  `).bind(
           questionId,
           language.code,
           translation.question_text,
-          translation.explanation,
-          translation.question_text_source,
-          translation.explanation_source
+          translation.question_text_source
         )
       );
     }
