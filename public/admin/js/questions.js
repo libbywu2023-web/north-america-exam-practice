@@ -191,6 +191,7 @@ function populateQuestionTopics(selectedTopicId = "") {
   `;
 }
 
+
 function renderQuestionTranslations(translations = {}) {
   const container = document.getElementById("question-translations");
 
@@ -198,15 +199,15 @@ function renderQuestionTranslations(translations = {}) {
     const code = escapeHTML(language.code);
     const name = escapeHTML(language.native_name || language.name);
     const existing = translations[language.code] || {};
-
     const isEnglish = language.code === "en";
-
     const questionSource = existing.question_text_source || "manual";
-    const explanationSource = existing.explanation_source || "manual";
 
     return `
-      <section class="exam-language-section">
-        <h4>${name} <span class="muted-text">(${code})</span></h4>
+      <details class="exam-language-section"
+        ${isEnglish ? "open" : ""}>
+        <summary>
+          ${name} <span class="muted-text">(${code})</span>
+        </summary>
 
         <label for="question-text-${code}">
           Question
@@ -215,19 +216,14 @@ function renderQuestionTranslations(translations = {}) {
           </span>
           <span class="muted-text">· ${escapeHTML(questionSource)}</span>
         </label>
+
         <textarea id="question-text-${code}" rows="3"
           ${isEnglish ? "required" : ""}>${escapeHTML(existing.question_text || "")}</textarea>
-
-        <label for="question-explanation-${code}">
-          Explanation
-          <span class="muted-text">· ${escapeHTML(explanationSource)}</span>
-        </label>
-        <textarea id="question-explanation-${code}" rows="3"
-          >${escapeHTML(existing.explanation || "")}</textarea>
-      </section>
+      </details>
     `;
   }).join("");
 }
+
 
 function renderOptions(options = []) {
   const container = document.getElementById("question-options");
@@ -239,8 +235,34 @@ function renderOptions(options = []) {
   updateOptionControls();
 }
 
+
 function createOptionHTML(option = {}, index = 0) {
   const key = option.option_key || String.fromCharCode(65 + index);
+
+  const english = languages.find(language => language.code === "en");
+  const otherLanguages = languages.filter(language => language.code !== "en");
+
+  const renderLanguageInput = (language, required = false) => {
+    const code = escapeHTML(language.code);
+    const name = escapeHTML(language.native_name || language.name);
+    const translation = option.translations?.[language.code] || {};
+    const value = translation.option_text || "";
+    const source = translation.translation_source || "manual";
+
+    return `
+      <label>
+        Option text - ${name} (${code})
+        <span class="muted-text">
+          ${required ? "Required" : "Optional"}
+        </span>
+        <span class="muted-text">· ${escapeHTML(source)}</span>
+      </label>
+      <input type="text" class="option-translation"
+        data-language="${code}"
+        value="${escapeHTML(value)}"
+        ${required ? "required" : ""}>
+    `;
+  };
 
   return `
     <section class="exam-language-section question-option"
@@ -261,33 +283,20 @@ function createOptionHTML(option = {}, index = 0) {
         Correct answer
       </label>
 
-${languages.map(language => {
-    const code = escapeHTML(language.code);
-    const name = escapeHTML(language.native_name || language.name);
+      ${english ? renderLanguageInput(english, true) : ""}
 
-    const translation = option.translations?.[language.code] || {};
-    const value = translation.option_text || "";
-    const source = translation.translation_source || "manual";
-
-    const isEnglish = language.code === "en";
-
-    return `
-    <label>
-      Option text - ${name} (${code})
-      <span class="muted-text">
-        ${isEnglish ? "Required" : "Optional"}
-      </span>
-      <span class="muted-text">· ${escapeHTML(source)}</span>
-    </label>
-    <input type="text" class="option-translation"
-      data-language="${code}"
-      value="${escapeHTML(value)}"
-      ${isEnglish ? "required" : ""}>
-  `;
-  }).join("")}
+      ${otherLanguages.length ? `
+        <details class="option-other-languages">
+          <summary>Other languages (${otherLanguages.length})</summary>
+          ${otherLanguages.map(language =>
+            renderLanguageInput(language)
+          ).join("")}
+        </details>
+      ` : ""}
     </section>
   `;
 }
+
 
 function updateOptionControls() {
   const container = document.getElementById("question-options");
@@ -412,14 +421,8 @@ function openModal(question = null) {
 
   populateQuestionTopics(question?.topic_id || "");
 
-  document.getElementById("question-difficulty").value =
-    question?.difficulty || "normal";
-
-  document.getElementById("question-status").value =
-    question?.status || "draft";
-
-  document.getElementById("question-source-url").value =
-    question?.explanation_source_url || "";
+// Difficulty 固定为 normal，Status 固定为 published。
+// Explanation Source URL 不再由后台表单录入。
 
   renderQuestionTranslations(question?.translations || {});
   renderOptions(question?.options || [
@@ -445,15 +448,13 @@ async function saveQuestion(event) {
 
   const id = document.getElementById("question-id").value;
 
-  const translations = {};
-  for (const language of languages) {
-    translations[language.code] = {
-      question_text: document
-        .getElementById(`question-text-${language.code}`).value.trim(),
-      explanation: document
-        .getElementById(`question-explanation-${language.code}`).value.trim()
-    };
-  }
+const translations = {};
+for (const language of languages) {
+  translations[language.code] = {
+    question_text: document
+      .getElementById(`question-text-${language.code}`).value.trim()
+  };
+}
 
   const optionSections = [
     ...document.querySelectorAll("#question-options .question-option")
@@ -480,16 +481,16 @@ async function saveQuestion(event) {
     alt: section.querySelector(".image-alt").value.trim()
   })).filter(image => image.url);
 
-  const payload = {
-    exam_id: Number(document.getElementById("question-exam").value),
-    topic_id: document.getElementById("question-topic").value,
-    difficulty: document.getElementById("question-difficulty").value,
-    status: document.getElementById("question-status").value,
-    explanation_source_url: document.getElementById("question-source-url").value.trim(),
-    translations,
-    options,
-    images
-  };
+const payload = {
+  exam_id: Number(document.getElementById("question-exam").value),
+  topic_id: document.getElementById("question-topic").value,
+  difficulty: "normal",
+  status: "published",
+  explanation_source_url: "",
+  translations,
+  options,
+  images
+};
 
   const saveButton = document.getElementById("save-question-button");
   saveButton.disabled = true;

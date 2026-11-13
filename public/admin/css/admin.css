@@ -788,7 +788,43 @@ body {
 ================================= */
 
 .exam-modal-content {
-  max-width: 680px;
+  width: min(1400px, calc(100vw - 48px));
+  max-width: none;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+}
+/* Question form: Exam and Topic side by side */
+.question-basic-fields {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: start;
+}
+
+.question-basic-field {
+  min-width: 0;
+}
+
+.question-basic-field label {
+  display: block;
+  margin: 14px 0 6px;
+  font-weight: 600;
+}
+
+.question-basic-field select {
+  width: 100%;
+}
+
+/* Answer options: two options per row */
+#question-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+#question-options .question-option {
+  min-width: 0;
+  margin-bottom: 0;
 }
 
 .exam-modal-content select,
@@ -840,6 +876,53 @@ body {
 .exam-language-section h4 {
   margin: 0 0 16px;
   font-size: 15px;
+}
+/* Collapsible language sections */
+.exam-language-section > summary,
+.option-other-languages > summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #1f2937;
+  list-style: none;
+}
+
+.exam-language-section > summary::-webkit-details-marker,
+.option-other-languages > summary::-webkit-details-marker {
+  display: none;
+}
+
+.exam-language-section > summary::before,
+.option-other-languages > summary::before {
+  content: "▶";
+  display: inline-block;
+  margin-right: 9px;
+  font-size: 11px;
+  transition: transform 0.15s ease;
+}
+
+.exam-language-section[open] > summary::before,
+.option-other-languages[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.exam-language-section > summary {
+  padding: 2px 0;
+}
+
+.exam-language-section[open] > summary {
+  margin-bottom: 16px;
+}
+
+.option-other-languages {
+  margin-top: 14px;
+  padding: 12px;
+  border: 1px solid #e5e7eb;
+  border-radius: 7px;
+  background: #f9fafb;
+}
+
+.option-other-languages[open] > summary {
+  margin-bottom: 12px;
 }
 
 .exam-language-section label {

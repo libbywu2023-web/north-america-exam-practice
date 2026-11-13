@@ -158,39 +158,23 @@
           <form id="question-form">
             <input type="hidden" id="question-id">
 
-            <label for="question-exam">Exam</label>
-            <select id="question-exam" required></select>
+<div class="question-basic-fields">
+  <div class="question-basic-field">
+    <label for="question-exam">Exam</label>
+    <select id="question-exam" required></select>
+  </div>
 
-            <label for="question-topic">Topic</label>
-            <select id="question-topic">
-              <option value="">No topic</option>
-            </select>
-
-            <label for="question-difficulty">Difficulty</label>
-            <select id="question-difficulty" required>
-              <option value="easy">Easy</option>
-              <option value="normal" selected>Normal</option>
-              <option value="hard">Hard</option>
-            </select>
-
-            <label for="question-status">Status</label>
-            <select id="question-status" required>
-              <option value="draft">Draft</option>
-              <option value="published">Published</option>
-              <option value="archived">Archived</option>
-            </select>
-
-            <label for="question-source-url">Explanation Source URL</label>
-            <input
-              id="question-source-url"
-              type="url"
-              placeholder="https://example.com/source"
-            >
-
+  <div class="question-basic-field">
+    <label for="question-topic">Topic</label>
+    <select id="question-topic">
+      <option value="">No topic</option>
+    </select>
+  </div>
+</div>
             <div class="exam-translations-heading">
               <h3>Question Translations</h3>
               <p class="muted-text">
-                Enter the question and explanation in each enabled language.
+                Enter the question in each enabled language.
               </p>
             </div>
 
