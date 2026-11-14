@@ -7,11 +7,14 @@ function updateSeo(examInfo) {
   const description = examInfo.description ||
     `${examInfo.title} practice questions on Exam Practice.`;
 
-  const canonicalUrl = new URL(
-  "/practice.html",
-  "https://north-america-exam-practice.libbywu2023.workers.dev"
-);
-  canonicalUrl.searchParams.set("exam", exam);
+  const canonicalPath =
+    lang === "zh-CN"
+      ? `/zh/${encodeURIComponent(exam)}`
+      : lang === "zh-TW"
+        ? `/zh-tw/${encodeURIComponent(exam)}`
+        : `/${encodeURIComponent(exam)}`;
+
+  const canonicalUrl = new URL(canonicalPath, location.origin);
 
   const localeMap = {
     en: "en_CA",
@@ -52,9 +55,31 @@ document.querySelector("#back-link").textContent = `← ${t.allExams}`;
 document.querySelector("#previous").textContent = t.previous;
 document.querySelector("#next").textContent = t.next;
 
-// Read URL parameters
+
+// Read exam slug from clean URL or legacy query parameters.
 const params = new URLSearchParams(location.search);
-const exam = params.get("exam") || "bc-class-7l";
+const pathname = location.pathname.toLowerCase();
+
+let exam = null;
+
+// Clean URL path takes priority over legacy query parameters.
+if (pathname.startsWith("/zh-tw/")) {
+  exam = pathname.slice("/zh-tw/".length);
+} else if (pathname.startsWith("/zh/")) {
+  exam = pathname.slice("/zh/".length);
+} else if (
+  pathname !== "/practice.html" &&
+  pathname !== "/practice" &&
+  pathname !== "/" &&
+  pathname !== "/zh" &&
+  pathname !== "/zh-tw"
+) {
+  exam = pathname.replace(/^\/|\/$/g, "");
+}
+
+// Fall back to legacy query parameters.
+exam = exam || params.get("exam") || "bc-class-7l";
+
 const topic = params.get("topic");
 
 let questions = [];
@@ -119,55 +144,55 @@ try {
 
   questions = data.questions || [];
   // Load exam information for SEO.
-try {
-  const examData = await api(
-    `/api/exams/${encodeURIComponent(exam)}?lang=${encodeURIComponent(lang)}`
+  try {
+    const examData = await api(
+      `/api/exams/${encodeURIComponent(exam)}?lang=${encodeURIComponent(lang)}`
+    );
+
+    if (examData.exam) {
+      updateSeo(examData.exam);
+    }
+  } catch (seoError) {
+    console.warn("Failed to load exam SEO information:", seoError);
+  }
+
+  if (!questions.length) {
+    throw new Error(t.noQuestions);
+  }
+
+  // Restore submitted answers using the current language.
+  await Promise.allSettled(
+    questions.map(async q => {
+      const savedResult = answerResults.get(String(q.id));
+
+      if (!savedResult?.submitted) return;
+
+      const result = await api(
+        `/api/questions/${q.id}/answer?lang=${encodeURIComponent(lang)}`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            option_id: Number(savedResult.selectedOptionId)
+          })
+        }
+      );
+
+      const correctOption = q.options.find(
+        option => String(option.id) === String(result.correct_option_id)
+      );
+
+      answerResults.set(String(q.id), {
+        selectedOptionId: Number(savedResult.selectedOptionId),
+        correctOptionId: result.correct_option_id,
+        submitted: true,
+        correct: result.correct,
+        correctOptionText: correctOption?.option_text || "",
+        explanation: result.explanation || ""
+      });
+    })
   );
 
-  if (examData.exam) {
-    updateSeo(examData.exam);
-  }
-} catch (seoError) {
-  console.warn("Failed to load exam SEO information:", seoError);
-}
-
- if (!questions.length) {
-  throw new Error(t.noQuestions);
-}
-
-// Restore submitted answers using the current language.
-await Promise.allSettled(
-  questions.map(async q => {
-    const savedResult = answerResults.get(String(q.id));
-
-    if (!savedResult?.submitted) return;
-
-    const result = await api(
-      `/api/questions/${q.id}/answer?lang=${encodeURIComponent(lang)}`,
-      {
-        method: "POST",
-        body: JSON.stringify({
-          option_id: Number(savedResult.selectedOptionId)
-        })
-      }
-    );
-
-    const correctOption = q.options.find(
-      option => String(option.id) === String(result.correct_option_id)
-    );
-
-    answerResults.set(String(q.id), {
-      selectedOptionId: Number(savedResult.selectedOptionId),
-      correctOptionId: result.correct_option_id,
-      submitted: true,
-      correct: result.correct,
-      correctOptionText: correctOption?.option_text || "",
-      explanation: result.explanation || ""
-    });
-  })
-);
-
-render();
+  render();
 
 } catch (error) {
   document.querySelector("#question").textContent = error.message;
@@ -345,19 +370,19 @@ function render() {
     input.name = "answer";
     input.value = option.id;
 
-input.disabled = false;
+    input.disabled = false;
 
-if (savedAnswer === option.id) {
-  input.checked = true;
+    if (savedAnswer === option.id) {
+      input.checked = true;
 
-  if (savedResult.submitted) {
-    if (savedResult.correct) {
-      label.classList.add("answer-correct");
-    } else {
-      label.classList.add("answer-incorrect");
+      if (savedResult.submitted) {
+        if (savedResult.correct) {
+          label.classList.add("answer-correct");
+        } else {
+          label.classList.add("answer-incorrect");
+        }
+      }
     }
-  }
-}
 
 
     const span = document.createElement("span");
@@ -407,16 +432,16 @@ rootOptions.addEventListener("change", async event => {
     || answerResults.get(q.id);
   submitting = true;
 
-answerResults.set(String(q.id), {
-  selectedOptionId: Number(selected.value),
-  submitted: false
-});
+  answerResults.set(String(q.id), {
+    selectedOptionId: Number(selected.value),
+    submitted: false
+  });
 
-savePracticeState();
+  savePracticeState();
 
-rootOptions.querySelectorAll("input").forEach(input => {
-  input.disabled = true;
-});
+  rootOptions.querySelectorAll("input").forEach(input => {
+    input.disabled = true;
+  });
 
   try {
     const result = await api(
@@ -433,32 +458,32 @@ rootOptions.querySelectorAll("input").forEach(input => {
       option => option.id === result.correct_option_id
     );
 
- answerResults.set(String(q.id), {
-  selectedOptionId: Number(selected.value),
-  correctOptionId: result.correct_option_id,
-  submitted: true,
-  correct: result.correct,
-  correctOptionText: correctOption?.option_text || "",
-  explanation: result.explanation || ""
-});
+    answerResults.set(String(q.id), {
+      selectedOptionId: Number(selected.value),
+      correctOptionId: result.correct_option_id,
+      submitted: true,
+      correct: result.correct,
+      correctOptionText: correctOption?.option_text || "",
+      explanation: result.explanation || ""
+    });
 
-savePracticeState();
+    savePracticeState();
 
     render();
 
   } catch (error) {
 
-  if (previousResult) {
-    answerResults.set(String(q.id), previousResult);
-  } else {
-    answerResults.delete(String(q.id));
+    if (previousResult) {
+      answerResults.set(String(q.id), previousResult);
+    } else {
+      answerResults.delete(String(q.id));
+    }
+
+    savePracticeState();
+    render();
+
+    alert(error.message);
   }
-
-  savePracticeState();
-  render();
-
-  alert(error.message);
-}
 });
 
 
@@ -493,11 +518,11 @@ document.querySelector("#retry").addEventListener("click", () => {
 
   if (!confirmed) return;
 
-answerResults.clear();
-index = 0;
-navStart = 0;
+  answerResults.clear();
+  index = 0;
+  navStart = 0;
 
-sessionStorage.removeItem(practiceStateKey);
+  sessionStorage.removeItem(practiceStateKey);
 
-render();
+  render();
 });

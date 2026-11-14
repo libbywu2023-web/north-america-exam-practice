@@ -25,11 +25,41 @@ export const copy = {
   }
 };
 export function getLanguage() {
+  const pathname = location.pathname.toLowerCase();
+
+  // Language prefixes in clean URLs take priority.
+  if (pathname === "/zh" || pathname.startsWith("/zh/")) {
+    return "zh-CN";
+  }
+
+  if (pathname === "/zh-tw" || pathname.startsWith("/zh-tw/")) {
+    return "zh-TW";
+  }
+
+  // Keep compatibility with existing URLs using ?lang=.
   const params = new URLSearchParams(location.search);
   const queryLang = params.get("lang");
+
+  if (["en", "zh-CN", "zh-TW"].includes(queryLang)) {
+    return queryLang;
+  }
+
+  // The root homepage defaults to English.
+  if (pathname === "/") {
+    return "en";
+  }
+
+  // Clean exam URLs without a language prefix are English.
+  const cleanPath = pathname.replace(/^\/|\/$/g, "");
+
+  if (/^[a-z0-9-]+$/.test(cleanPath)) {
+    return "en";
+  }
+
+  // Retain the saved preference for other existing pages.
   const saved = localStorage.getItem("exam-language");
-  return ["en","zh-CN","zh-TW"].includes(queryLang) ? queryLang :
-    (["en","zh-CN","zh-TW"].includes(saved) ? saved : "en");
+
+  return ["en", "zh-CN", "zh-TW"].includes(saved) ? saved : "en";
 }
 export function clientId() {
   let id = localStorage.getItem("exam-client-id");
@@ -55,11 +85,56 @@ export async function api(path, options = {}) {
 export function setLanguageSelect(lang) {
   const select = document.querySelector("#language");
   if (!select) return;
+
   select.value = lang;
+
   select.addEventListener("change", () => {
-    localStorage.setItem("exam-language", select.value);
-    const url = new URL(location.href);
-    url.searchParams.set("lang", select.value);
-    location.href = url.toString();
+    const newLang = select.value;
+
+    localStorage.setItem("exam-language", newLang);
+
+    const pathname = location.pathname.toLowerCase();
+    const params = new URLSearchParams(location.search);
+
+    // Identify the current exam slug.
+    let exam = params.get("exam");
+
+    if (pathname.startsWith("/zh-tw/")) {
+      exam = pathname.slice("/zh-tw/".length);
+    } else if (pathname.startsWith("/zh/")) {
+      exam = pathname.slice("/zh/".length);
+    } else if (pathname !== "/zh" && pathname !== "/zh-tw") {
+      const pathExam = pathname.replace(/^\/|\/$/g, "");
+
+      if (pathExam && !pathExam.includes(".")) {
+        exam = pathExam;
+      }
+    }
+
+    // Build the new language URL.
+    let newPath = "/";
+
+    if (exam) {
+      if (newLang === "zh-CN") {
+        newPath = `/zh/${exam}`;
+      } else if (newLang === "zh-TW") {
+        newPath = `/zh-tw/${exam}`;
+      } else {
+        newPath = `/${exam}`;
+      }
+    } else {
+      if (newLang === "zh-CN") {
+        newPath = "/zh";
+      } else if (newLang === "zh-TW") {
+        newPath = "/zh-tw";
+      }
+    }
+
+    // Preserve other useful parameters, such as topic.
+    params.delete("lang");
+    params.delete("exam");
+
+    const query = params.toString();
+    location.href = query ? `${newPath}?${query}` : newPath;
   });
 }

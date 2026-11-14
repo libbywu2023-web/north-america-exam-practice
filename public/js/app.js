@@ -173,9 +173,15 @@ function createElement(tag, className, text) {
 function createExamLink(exam) {
   const link = createElement("a", "catalog-exam-link", exam.title);
 
-  link.href =
-    `/practice.html?exam=${encodeURIComponent(exam.slug)}` +
-    `&lang=${encodeURIComponent(lang)}`;
+  const slug = encodeURIComponent(exam.slug);
+
+  if (lang === "zh-CN") {
+    link.href = `/zh/${slug}`;
+  } else if (lang === "zh-TW") {
+    link.href = `/zh-tw/${slug}`;
+  } else {
+    link.href = `/${slug}`;
+  }
 
   return link;
 }

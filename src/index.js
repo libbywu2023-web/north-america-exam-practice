@@ -290,18 +290,18 @@ async function api(request, env) {
     return json({ exams: await listExams(env.DB, lang) });
   }
   if (request.method === "GET" && path === "/api/catalog") {
-  return json({
-    exams: await listCatalogExams(env.DB, lang)
-  });
-}
+    return json({
+      exams: await listCatalogExams(env.DB, lang)
+    });
+  }
 
   const examMatch = path.match(/^\/api\/exams\/([a-z0-9-]+)$/);
   if (request.method === "GET" && examMatch) {
     const exam = await getPublishedExam(env.DB)
-  .bind(lang, examMatch[1])
-  .first();
+      .bind(lang, examMatch[1])
+      .first();
     if (!exam) return json({ error: "Exam not found" }, 404);
-const topics = await env.DB.prepare(`
+    const topics = await env.DB.prepare(`
   SELECT
     t.id,
     t.slug,
@@ -328,7 +328,7 @@ const topics = await env.DB.prepare(`
   ORDER BY t.sort_order
 `).bind(lang, lang, exam.id).all();
 
-return json({ exam, topics: topics.results || [] });
+    return json({ exam, topics: topics.results || [] });
   }
 
   const questionsMatch = path.match(/^\/api\/exams\/([a-z0-9-]+)\/questions$/);
@@ -380,25 +380,25 @@ return json({ exam, topics: topics.results || [] });
     });
   }
 
-if (request.method === "POST" && path === "/api/mock/start") {
-  const clientId = getClientId(request);
-  if (!clientId) {
-    return json({ error: "A valid x-client-id header is required." }, 400);
-  }
+  if (request.method === "POST" && path === "/api/mock/start") {
+    const clientId = getClientId(request);
+    if (!clientId) {
+      return json({ error: "A valid x-client-id header is required." }, 400);
+    }
 
-  const body = await request.json().catch(() => ({}));
-  const slug = typeof body.exam_slug === "string"
-    ? body.exam_slug
-    : "bc-class-7l";
+    const body = await request.json().catch(() => ({}));
+    const slug = typeof body.exam_slug === "string"
+      ? body.exam_slug
+      : "bc-class-7l";
 
-  const exam = await env.DB.prepare(
-    "SELECT id, question_count FROM exams WHERE slug = ? AND status = 'published'"
-  ).bind(slug).first();
+    const exam = await env.DB.prepare(
+      "SELECT id, question_count FROM exams WHERE slug = ? AND status = 'published'"
+    ).bind(slug).first();
 
-  if (!exam) return json({ error: "Exam not found." }, 404);
+    if (!exam) return json({ error: "Exam not found." }, 404);
 
-  // Randomly select questions.
-  const selected = await env.DB.prepare(`
+    // Randomly select questions.
+    const selected = await env.DB.prepare(`
     SELECT id
     FROM questions
     WHERE exam_id = ? AND status = 'published'
@@ -406,32 +406,32 @@ if (request.method === "POST" && path === "/api/mock/start") {
     LIMIT ?
   `).bind(exam.id, exam.question_count).all();
 
-  const ids = (selected.results || []).map(x => x.id);
+    const ids = (selected.results || []).map(x => x.id);
 
-  if (!ids.length) {
-    return json({ error: "No published questions available." }, 400);
-  }
+    if (!ids.length) {
+      return json({ error: "No published questions available." }, 400);
+    }
 
-  const attemptId = crypto.randomUUID();
+    const attemptId = crypto.randomUUID();
 
-  await env.DB.prepare(`
+    await env.DB.prepare(`
     INSERT INTO exam_attempts
       (id, exam_id, client_id, mode, language_code, total_questions)
     VALUES (?, ?, ?, 'mock', ?, ?)
   `).bind(attemptId, exam.id, clientId, lang, ids.length).run();
 
-  // Save the question order.
-  const statements = ids.map((id, index) =>
-    env.DB.prepare(`
+    // Save the question order.
+    const statements = ids.map((id, index) =>
+      env.DB.prepare(`
       INSERT INTO attempt_questions (attempt_id, question_id, sort_order)
       VALUES (?, ?, ?)
     `).bind(attemptId, id, index + 1)
-  );
+    );
 
-  await env.DB.batch(statements);
+    await env.DB.batch(statements);
 
-  // Fetch all question text and options in one query.
-  const result = await env.DB.prepare(`
+    // Fetch all question text and options in one query.
+    const result = await env.DB.prepare(`
     SELECT
       q.id,
       qt.question_text,
@@ -452,42 +452,42 @@ if (request.method === "POST" && path === "/api/mock/start") {
     ORDER BY aq.sort_order, qo.sort_order
   `).bind(lang, lang, attemptId).all();
 
-  // Group options under their questions.
-  const questionMap = new Map();
+    // Group options under their questions.
+    const questionMap = new Map();
 
-  for (const row of result.results || []) {
-    if (!questionMap.has(row.id)) {
-      questionMap.set(row.id, {
-        id: row.id,
-        question: row.question_text,
-        images: [],
-        options: []
+    for (const row of result.results || []) {
+      if (!questionMap.has(row.id)) {
+        questionMap.set(row.id, {
+          id: row.id,
+          question: row.question_text,
+          images: [],
+          options: []
+        });
+      }
+
+      questionMap.get(row.id).options.push({
+        id: row.option_id,
+        option_key: row.option_key,
+        sort_order: row.sort_order,
+        option_text: row.option_text
       });
     }
 
-    questionMap.get(row.id).options.push({
-      id: row.option_id,
-      option_key: row.option_key,
-      sort_order: row.sort_order,
-      option_text: row.option_text
+    // Load all images for this attempt in one query.
+    const imagesByQuestion = await getAttemptQuestionImages(env.DB, attemptId);
+
+    for (const [questionId, images] of imagesByQuestion) {
+      const question = questionMap.get(questionId);
+      if (question) question.images = images;
+    }
+
+    return json({
+      attempt_id: attemptId,
+      questions: ids
+        .map(id => questionMap.get(id))
+        .filter(Boolean)
     });
   }
-
-  // Load all images for this attempt in one query.
-  const imagesByQuestion = await getAttemptQuestionImages(env.DB, attemptId);
-
-  for (const [questionId, images] of imagesByQuestion) {
-    const question = questionMap.get(questionId);
-    if (question) question.images = images;
-  }
-
-  return json({
-    attempt_id: attemptId,
-    questions: ids
-      .map(id => questionMap.get(id))
-      .filter(Boolean)
-  });
-}
 
   const mockSubmitMatch = path.match(/^\/api\/mock\/([0-9a-f-]+)\/submit$/);
   if (request.method === "POST" && mockSubmitMatch) {
@@ -573,34 +573,34 @@ export default {
     const url = new URL(request.url);
     try {
       if (url.pathname.startsWith("/api/admin/languages")) {
-  return await handleAdminLanguages(request, env);
-}
+        return await handleAdminLanguages(request, env);
+      }
       // Admin authentication routes
       if (url.pathname.startsWith("/api/admin/countries")) {
-  return await handleAdminCountries(request, env);
-}
+        return await handleAdminCountries(request, env);
+      }
 
-if (url.pathname.startsWith("/api/admin/regions")) {
-  return await handleAdminRegions(request, env);
-}
-if (url.pathname.startsWith("/api/admin/categories")) {
-  return await handleAdminCategories(request, env);
-}
-if (url.pathname.startsWith("/api/admin/exams")) {
-  return await handleAdminExams(request, env);
-}
-if (url.pathname.startsWith("/api/admin/topics")) {
-return await handleAdminTopics(request, env);
-}
-if (url.pathname.startsWith("/api/admin/questions")) {
-  return await handleAdminQuestions(request, env);
-}
-if (url.pathname === "/api/admin/images") {
-  return await handleAdminImages(request, env);
-}
-if (url.pathname.startsWith("/api/admin/")) {
-  return await handleAdminAuth(request, env);
-}
+      if (url.pathname.startsWith("/api/admin/regions")) {
+        return await handleAdminRegions(request, env);
+      }
+      if (url.pathname.startsWith("/api/admin/categories")) {
+        return await handleAdminCategories(request, env);
+      }
+      if (url.pathname.startsWith("/api/admin/exams")) {
+        return await handleAdminExams(request, env);
+      }
+      if (url.pathname.startsWith("/api/admin/topics")) {
+        return await handleAdminTopics(request, env);
+      }
+      if (url.pathname.startsWith("/api/admin/questions")) {
+        return await handleAdminQuestions(request, env);
+      }
+      if (url.pathname === "/api/admin/images") {
+        return await handleAdminImages(request, env);
+      }
+      if (url.pathname.startsWith("/api/admin/")) {
+        return await handleAdminAuth(request, env);
+      }
       if (url.pathname.startsWith("/api/")) {
         if (request.method === "OPTIONS") {
           return new Response(null, {
@@ -617,8 +617,68 @@ if (url.pathname.startsWith("/api/admin/")) {
       }
 
       if (url.pathname.startsWith("/images/questions/")) {
-  return await handlePublicImage(request, env);
-}
+        return await handlePublicImage(request, env);
+      }
+
+      // Handle clean homepage URLs for Chinese languages.
+      if (
+        request.method === "GET" &&
+        (url.pathname === "/zh" ||
+          url.pathname === "/zh/" ||
+          url.pathname === "/zh-tw" ||
+          url.pathname === "/zh-tw/")
+      ) {
+        const assetUrl = new URL(request.url);
+        assetUrl.pathname = "/";
+
+        return env.ASSETS.fetch(
+          new Request(assetUrl.toString(), request)
+        );
+      }
+
+      // Handle clean exam URLs.
+      if (request.method === "GET") {
+        let examSlug = null;
+        let routeLang = "en";
+
+        const simplifiedMatch = url.pathname.match(
+          /^\/zh\/([a-z0-9-]+)\/?$/
+        );
+
+        const traditionalMatch = url.pathname.match(
+          /^\/zh-tw\/([a-z0-9-]+)\/?$/
+        );
+
+        const englishMatch = url.pathname.match(
+          /^\/([a-z0-9-]+)\/?$/
+        );
+
+        if (simplifiedMatch) {
+          examSlug = simplifiedMatch[1];
+          routeLang = "zh-CN";
+        } else if (traditionalMatch) {
+          examSlug = traditionalMatch[1];
+          routeLang = "zh-TW";
+        } else if (englishMatch) {
+          examSlug = englishMatch[1];
+        }
+
+        if (examSlug) {
+          const exam = await getPublishedExam(env.DB)
+            .bind(routeLang, examSlug)
+            .first();
+
+          if (exam) {
+            const assetUrl = new URL(request.url);
+            assetUrl.pathname = "/practice";
+
+            return env.ASSETS.fetch(
+              new Request(assetUrl.toString(), request)
+            );
+          }
+        }
+      }
+
       return env.ASSETS.fetch(request);
     } catch (error) {
       console.error("Request failed", error);
