@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Question Import | Exam Practice CMS</title>
+  <link rel="stylesheet" href="/admin/css/admin.css">
+  <style>
+    .import-card {
+      margin-top: 22px;
+      padding: 24px;
+      min-height: auto;
+    }
+    .import-card h2 {
+      margin: 0 0 12px;
+      font-size: 19px;
+    }
+    .import-card p {
+      color: #6b7280;
+      font-size: 14px;
+      line-height: 1.7;
+    }
+    .import-field {
+      margin: 18px 0;
+    }
+    .import-field label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 600;
+      color: #374151;
+    }
+    .import-field select,
+    .import-field input[type="file"] {
+      width: 100%;
+      max-width: 560px;
+      padding: 11px 12px;
+      border: 1px solid #d1d5db;
+      border-radius: 7px;
+      background: #fff;
+      font-size: 14px;
+    }
+    .import-hint {
+      font-size: 12px !important;
+      color: #6b7280;
+    }
+    .import-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 18px;
+    }
+    .import-stats {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(120px, 1fr));
+      gap: 14px;
+      margin-top: 20px;
+    }
+    .import-stat {
+      padding: 18px;
+      background: #f8fafc;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+    }
+    .import-stat strong {
+      display: block;
+      font-size: 25px;
+      margin-bottom: 5px;
+    }
+    .import-stat span {
+      color: #64748b;
+      font-size: 13px;
+    }
+    .import-status {
+      margin-top: 16px;
+      font-size: 14px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+    }
+    .import-status.error { color: #dc2626; }
+    .import-status.success { color: #15803d; }
+    .import-status.warning { color: #b45309; }
+    .import-error-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .import-error-table th,
+    .import-error-table td {
+      text-align: left;
+      vertical-align: top;
+      padding: 10px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .import-error-table th {
+      background: #f8fafc;
+    }
+    .import-error-table td:last-child {
+      white-space: normal;
+      min-width: 240px;
+    }
+    @media (max-width: 768px) {
+      .import-stats {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .import-card {
+        padding: 17px;
+      }
+    }
+  </style>
+</head>
+<body class="dashboard-page">
+
+  <header class="admin-header">
+    <a class="admin-brand" href="/admin/dashboard/">
+      <span class="admin-logo">EP</span>
+      <span>Exam Practice CMS</span>
+    </a>
+    <div class="admin-header-right">
+      <span class="admin-user">Administrator</span>
+      <button id="logout-button" class="logout-button">Sign Out</button>
+    </div>
+  </header>
+
+  <div class="admin-layout">
+    <aside class="admin-sidebar">
+      <div class="sidebar-label">MAIN MENU</div>
+      <a class="sidebar-link" href="/admin/dashboard/">
+        <span>▦</span> Dashboard
+      </a>
+
+      <div class="sidebar-label">CONTENT MANAGEMENT</div>
+
+      <a class="sidebar-link" href="/admin/countries/">
+        <span>🌎</span> Countries
+      </a>
+      <a class="sidebar-link" href="/admin/regions/">
+        <span>📍</span> Regions
+      </a>
+      <a class="sidebar-link" href="/admin/categories/">
+        <span>📚</span> Exam Categories
+      </a>
+      <a class="sidebar-link" href="/admin/exams/">
+        <span>📝</span> Exams
+      </a>
+      <a class="sidebar-link" href="/admin/topics/">
+        <span>📂</span> Topics
+      </a>
+      <a class="sidebar-link" href="/admin/questions/">
+        <span>❓</span> Questions
+      </a>
+      <a class="sidebar-link active" href="/admin/imports/">
+        <span>📥</span> Question Import
+      </a>
+      <a class="sidebar-link" href="/admin/languages/">
+        <span>🌐</span> Languages
+      </a>
+    </aside>
+
+    <main class="admin-main">
+      <div class="page-heading">
+        <div>
+          <h1>Question Import</h1>
+          <p>Import multilingual questions and answer options from Excel.</p>
+        </div>
+      </div>
+
+      <section class="dashboard-welcome">
+        <h2>Bulk Question Import</h2>
+        <p>
+          Import questions into the staging area for later image matching,
+          review and publication. Existing questions with the same
+          External Question ID will be skipped, never overwritten.
+        </p>
+      </section>
+
+      <section class="module-card import-card">
+        <h2>1. Select Exam</h2>
+        <p>
+          Choose the exam to which these questions belong.
+          The Exam URL Slug in the workbook is resolved automatically
+          from this selection.
+        </p>
+
+        <div class="import-field">
+          <label for="exam-select">Exam</label>
+          <select id="exam-select">
+            <option value="">Loading exams...</option>
+          </select>
+          <p id="exam-info" class="import-hint"></p>
+        </div>
+      </section>
+
+      <section class="module-card import-card">
+        <h2>2. Download Excel Template</h2>
+        <p>
+          The workbook must contain two sheets named
+          <strong>Questions</strong> and <strong>Options</strong>.
+          Keep the column headers unchanged.
+        </p>
+        <div class="import-actions">
+          <button type="button" id="download-template" class="secondary-button">
+            Download Excel Template
+          </button>
+        </div>
+      </section>
+
+      <section class="module-card import-card">
+        <h2>3. Upload Excel File</h2>
+        <p>
+          Select a completed Excel workbook (.xlsx or .xls).
+          The browser will read the workbook locally before sending
+          the question data to the server.
+        </p>
+
+        <div class="import-field">
+          <label for="excel-file">Excel Workbook</label>
+          <input
+            type="file"
+            id="excel-file"
+            accept=".xlsx,.xls"
+          >
+          <p id="file-info" class="import-hint">
+            No file selected.
+          </p>
+        </div>
+
+        <div class="import-actions">
+          <button type="button" id="preview-button" class="secondary-button">
+            Check Workbook
+          </button>
+          <button type="button" id="import-button" class="primary-button" disabled>
+            Import Questions
+          </button>
+        </div>
+
+        <p id="preview-message" class="import-status" role="status"></p>
+      </section>
+
+      <section id="preview-card" class="module-card import-card" hidden>
+        <h2>4. Import Preview</h2>
+        <div class="import-stats">
+          <div class="import-stat">
+            <strong id="preview-questions">0</strong>
+            <span>Question rows</span>
+          </div>
+          <div class="import-stat">
+            <strong id="preview-options">0</strong>
+            <span>Option rows</span>
+          </div>
+          <div class="import-stat">
+            <strong id="preview-images">0</strong>
+            <span>Questions with images</span>
+          </div>
+          <div class="import-stat">
+            <strong id="preview-size">0 KB</strong>
+            <span>Estimated JSON size</span>
+          </div>
+        </div>
+        <p id="preview-summary" class="import-status"></p>
+      </section>
+
+      <section id="result-card" class="module-card import-card" hidden>
+        <h2>5. Import Results</h2>
+        <div class="import-stats">
+          <div class="import-stat">
+            <strong id="result-imported">0</strong>
+            <span>Imported</span>
+          </div>
+          <div class="import-stat">
+            <strong id="result-skipped">0</strong>
+            <span>Skipped</span>
+          </div>
+          <div class="import-stat">
+            <strong id="result-errors">0</strong>
+            <span>Errors</span>
+          </div>
+          <div class="import-stat">
+            <strong id="result-warnings">0</strong>
+            <span>Warnings</span>
+          </div>
+        </div>
+        <p id="result-summary" class="import-status"></p>
+        <div class="table-responsive">
+          <table class="import-error-table">
+            <thead>
+              <tr>
+                <th>Severity</th>
+                <th>Excel Row</th>
+                <th>External ID</th>
+                <th>Issue</th>
+              </tr>
+            </thead>
+            <tbody id="result-errors-body"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <footer class="admin-footer">
+        North America Exam Practice CMS
+      </footer>
+    </main>
+  </div>
+
+  <script src="/admin/js/dashboard.js"></script>
+  <script src="/admin/js/vendor/xlsx.full.min.js"></script>
+  <script src="/admin/js/imports.js"></script>
+</body>
+</html>

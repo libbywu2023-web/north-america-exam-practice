@@ -103,7 +103,12 @@ export function setLanguageSelect(lang) {
       exam = pathname.slice("/zh-tw/".length);
     } else if (pathname.startsWith("/zh/")) {
       exam = pathname.slice("/zh/".length);
-    } else if (pathname !== "/zh" && pathname !== "/zh-tw") {
+        } else if (
+      pathname !== "/zh" &&
+      pathname !== "/zh-tw" &&
+      pathname !== "/practice" &&
+      pathname !== "/practice.html"
+    ) {
       const pathExam = pathname.replace(/^\/|\/$/g, "");
 
       if (pathExam && !pathExam.includes(".")) {

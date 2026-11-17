@@ -470,7 +470,18 @@ body {
   margin: 0;
   font-size: 21px;
 }
+.review-bulk-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
 
+.review-bulk-actions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
 .table-responsive {
   width: 100%;
   overflow-x: auto;

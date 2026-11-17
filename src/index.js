@@ -7,6 +7,8 @@ import { handleAdminExams } from "./admin-exams.js";
 import { handleAdminTopics } from "./admin-topics.js";
 import { handleAdminQuestions } from "./admin-questions.js";
 import { handleAdminImages, handlePublicImage } from "./admin-images.js";
+import { handleAdminImports } from "./admin-imports.js";
+import { handleAdminReview } from "./admin-review.js";
 
 
 const JSON_HEADERS = {
@@ -597,6 +599,14 @@ export default {
       }
       if (url.pathname === "/api/admin/images") {
         return await handleAdminImages(request, env);
+      }
+
+      if (url.pathname === "/api/admin/imports") {
+        return await handleAdminImports(request, env);
+      }
+      if (url.pathname === "/api/admin/review" ||
+          url.pathname.startsWith("/api/admin/review/")) {
+        return await handleAdminReview(request, env);
       }
       if (url.pathname.startsWith("/api/admin/")) {
         return await handleAdminAuth(request, env);

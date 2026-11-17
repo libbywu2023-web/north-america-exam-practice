@@ -100,10 +100,13 @@ function loadPracticeState() {
         : 0,
       answers: saved.answers && typeof saved.answers === "object"
         ? saved.answers
-        : {}
+        : {},
+      questionIds: Array.isArray(saved.questionIds)
+        ? saved.questionIds.map(String)
+        : []
     };
   } catch {
-    return { index: 0, answers: {} };
+    return { index: 0, answers: {}, questionIds: [] };
   }
 }
 
@@ -118,10 +121,56 @@ function savePracticeState() {
     practiceStateKey,
     JSON.stringify({
       index,
-      answers: Object.fromEntries(answerResults)
+      answers: Object.fromEntries(answerResults),
+      questionIds: questions.map(question => String(question.id))
     })
   );
 }
+
+function shuffleQuestions(items, ensureDifferent = false) {
+  const shuffled = [...items];
+
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+
+  if (
+    ensureDifferent &&
+    shuffled.length > 1 &&
+    shuffled.every((question, index) =>
+      String(question.id) === String(items[index].id)
+    )
+  ) {
+    [shuffled[0], shuffled[1]] = [shuffled[1], shuffled[0]];
+  }
+
+  return shuffled;
+}
+
+function restoreQuestionOrder(items, savedIds) {
+  if (!savedIds.length) {
+    return shuffleQuestions(items);
+  }
+
+  const questionsById = new Map(
+    items.map(question => [String(question.id), question])
+  );
+  const ordered = [];
+
+  savedIds.forEach(id => {
+    const question = questionsById.get(id);
+    if (question) {
+      ordered.push(question);
+      questionsById.delete(id);
+    }
+  });
+
+  // Append any newly available questions without disturbing the saved order.
+  ordered.push(...questionsById.values());
+  return ordered;
+}
+
 
 let submitting = false;
 
@@ -143,6 +192,16 @@ try {
   );
 
   questions = data.questions || [];
+
+  // Restore the saved question order, or randomize the first practice session.
+  questions = restoreQuestionOrder(
+    questions,
+    practiceState.questionIds
+  );
+
+  // Persist the initial randomized order immediately, before any answer is submitted.
+  savePracticeState();
+
   // Load exam information for SEO.
   try {
     const examData = await api(
@@ -522,7 +581,9 @@ document.querySelector("#retry").addEventListener("click", () => {
   index = 0;
   navStart = 0;
 
-  sessionStorage.removeItem(practiceStateKey);
+  // A confirmed retry starts a fresh randomized question order.
+  questions = shuffleQuestions(questions, true);
 
+  savePracticeState();
   render();
 });

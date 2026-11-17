@@ -91,7 +91,41 @@ async function uploadImage(request, env) {
     }, 400);
   }
 
+  const stagingQuestionIdRaw = formData.get("staging_question_id");
+  const stagingQuestionId = stagingQuestionIdRaw === null
+    ? null
+    : Number(stagingQuestionIdRaw);
+
+  if (stagingQuestionIdRaw !== null &&
+      (!Number.isInteger(stagingQuestionId) || stagingQuestionId <= 0)) {
+    return jsonResponse({ error: "Invalid staging question ID." }, 400);
+  }
+
+  if (stagingQuestionId !== null) {
+    const question = await env.DB.prepare(`
+      SELECT id, status, has_image
+      FROM questions_staging
+      WHERE id = ?
+    `).bind(stagingQuestionId).first();
+
+    if (!question) return jsonResponse({ error: "Staging question not found." }, 404);
+    if (question.status === "published") {
+      return jsonResponse({ error: "Published questions are read-only." }, 409);
+    }
+
+    const count = await env.DB.prepare(`
+      SELECT COUNT(*) AS total
+      FROM staging_question_images
+      WHERE staging_question_id = ?
+    `).bind(stagingQuestionId).first();
+
+    if ((count?.total || 0) >= 8) {
+      return jsonResponse({ error: "A question can have at most 8 images." }, 409);
+    }
+  }
+
   const key = `questions/${crypto.randomUUID()}.${extension}`;
+  let objectStored = false;
 
   try {
     await env.exam_question_images.put(key, imageData, {
@@ -100,19 +134,68 @@ async function uploadImage(request, env) {
         cacheControl: "public, max-age=31536000, immutable"
       }
     });
+    objectStored = true;
+
+    let image = null;
+    if (stagingQuestionId !== null) {
+      const order = await env.DB.prepare(`
+        SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order
+        FROM staging_question_images
+        WHERE staging_question_id = ?
+      `).bind(stagingQuestionId).first();
+      const sortOrder = Number(order?.next_order || 0);
+
+      const insert = await env.DB.prepare(`
+        INSERT INTO staging_question_images
+          (staging_question_id, r2_key, original_filename, mime_type, sort_order)
+        VALUES (?, ?, ?, ?, ?)
+      `).bind(
+        stagingQuestionId,
+        key,
+        String(file.name || "question-image").slice(0, 255),
+        file.type,
+        sortOrder
+      ).run();
+
+      await env.DB.prepare(`
+        UPDATE questions_staging
+        SET status = CASE
+          WHEN status = 'waiting_for_image' THEN 'pending_review'
+          ELSE status
+        END
+        WHERE id = ? AND status <> 'published'
+      `).bind(stagingQuestionId).run();
+
+      image = {
+        id: insert.meta?.last_row_id,
+        r2_key: key,
+        original_filename: String(file.name || "question-image"),
+        mime_type: file.type,
+        alt_text: "",
+        sort_order: sortOrder,
+        url: `/images/${key}`
+      };
+    }
 
     return jsonResponse({
       success: true,
       key,
       url: `/images/${key}`,
       size: file.size,
-      content_type: file.type
+      content_type: file.type,
+      image
     });
   } catch (error) {
+    if (objectStored) {
+      await env.exam_question_images.delete(key).catch(cleanupError => {
+        console.error("Uploaded image cleanup failed:", cleanupError);
+      });
+    }
     console.error("Image upload failed:", error);
-
     return jsonResponse({
-      error: "Image upload failed."
+      error: error?.message?.includes("at most 8 images")
+        ? "A question can have at most 8 images."
+        : "Image upload or staging association failed."
     }, 500);
   }
 }
@@ -134,6 +217,16 @@ async function deleteImage(request, env) {
     return jsonResponse({ error: "Invalid image key." }, 400);
   }
 
+  const stagingQuestionIdRaw = body.staging_question_id;
+  const stagingQuestionId = stagingQuestionIdRaw === undefined
+    ? null
+    : Number(stagingQuestionIdRaw);
+
+  if (stagingQuestionIdRaw !== undefined &&
+      (!Number.isInteger(stagingQuestionId) || stagingQuestionId <= 0)) {
+    return jsonResponse({ error: "Invalid staging question ID." }, 400);
+  }
+
   const imageUrl = `/images/${key}`;
 
   const reference = await env.DB.prepare(`
@@ -149,12 +242,61 @@ async function deleteImage(request, env) {
   }
 
   try {
-    await env.exam_question_images.delete(key);
+    if (stagingQuestionId !== null) {
+      const question = await env.DB.prepare(`
+        SELECT id, status, has_image
+        FROM questions_staging
+        WHERE id = ?
+      `).bind(stagingQuestionId).first();
 
-    return jsonResponse({
-      success: true,
-      message: "Image deleted."
-    });
+      if (!question) return jsonResponse({ error: "Staging question not found." }, 404);
+      if (question.status === "published") {
+        return jsonResponse({ error: "Published questions are read-only." }, 409);
+      }
+
+      const image = await env.DB.prepare(`
+        SELECT id FROM staging_question_images
+        WHERE staging_question_id = ? AND r2_key = ?
+      `).bind(stagingQuestionId, key).first();
+
+      if (!image) return jsonResponse({ error: "Image is not attached to this question." }, 404);
+
+      await env.DB.prepare(`
+        DELETE FROM staging_question_images
+        WHERE id = ?
+      `).bind(image.id).run();
+
+      const remaining = await env.DB.prepare(`
+        SELECT COUNT(*) AS total
+        FROM staging_question_images
+        WHERE staging_question_id = ?
+      `).bind(stagingQuestionId).first();
+
+      if ((remaining?.total || 0) === 0) {
+        await env.DB.prepare(`
+          UPDATE questions_staging
+          SET status = CASE
+            WHEN has_image = 1 THEN 'waiting_for_image'
+            WHEN status = 'approved' THEN 'pending_review'
+            ELSE status
+          END
+          WHERE id = ? AND status <> 'published'
+        `).bind(stagingQuestionId).run();
+      }
+    }
+
+    const otherStagingReferences = await env.DB.prepare(`
+      SELECT COUNT(*) AS total
+      FROM staging_question_images
+      WHERE r2_key = ?
+    `).bind(key).first();
+
+    if ((!otherStagingReferences || otherStagingReferences.total === 0) &&
+        (!reference || reference.total === 0)) {
+      await env.exam_question_images.delete(key);
+    }
+
+    return jsonResponse({ success: true, message: "Image deleted." });
   } catch (error) {
     console.error("Image deletion failed:", error);
 
