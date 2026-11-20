@@ -3,19 +3,50 @@ import { api, copy, getLanguage, setLanguageSelect } from "./common.js";
 const lang = getLanguage();
 const t = copy[lang];
 const practiceLabels = {
-  en: { position: (n,total) => `Question ${n} of ${total}`, bank: n => `${n} questions in bank`, perSet: n => `${n} questions per set` },
-  "zh-CN": { position: (n,total) => `第 ${n} / ${total} 题`, bank: n => `题库共 ${n} 题`, perSet: n => `每组 ${n} 题` },
-  "zh-TW": { position: (n,total) => `第 ${n} / ${total} 題`, bank: n => `題庫共 ${n} 題`, perSet: n => `每組 ${n} 題` }
-}[lang] || { position: (n,total) => `Question ${n} of ${total}`, bank: n => `${n} questions in bank`, perSet: n => `${n} questions per set` };
-let bankTotal = null;
+  en: { position: (n,total) => `Question ${n} of ${total}`, perSet: n => `${n} questions per set` },
+  "zh-CN": { position: (n,total) => `第 ${n} / ${total} 题`, perSet: n => `每组 ${n} 题` },
+  "zh-TW": { position: (n,total) => `第 ${n} / ${total} 題`, perSet: n => `每組 ${n} 題` }
+}[lang];
 let perSetCount = null;
-function updateBankSummary() {
-  const summary = document.querySelector("#practice-bank-summary");
-  if (!summary || topic || !questions.length) return;
-  const total = bankTotal ?? questions.length;
-  document.querySelector("#practice-bank-total").textContent = practiceLabels.bank(total);
-  document.querySelector("#practice-bank-per-set").textContent = practiceLabels.perSet(perSetCount || questions.length);
-  summary.hidden = false;
+function updatePerSet() {
+  const label = document.querySelector("#practice-per-set");
+  if (!label || topic || !questions.length) return;
+  label.textContent = practiceLabels.perSet(perSetCount || questions.length);
+  label.hidden = false;
+}
+function renderExamRegion(examInfo) {
+  const subtitle = document.querySelector("#practice-heading-subtitle");
+  if (!subtitle) return;
+  const country = examInfo.country_name;
+  const region = examInfo.region_name;
+  if (!country && !region) { subtitle.hidden = true; return; }
+  subtitle.replaceChildren();
+  const countryCode = String(examInfo.country_code || "").toUpperCase();
+  if (/^[A-Z]{2}$/.test(countryCode)) {
+    const flag = String.fromCodePoint(...[...countryCode].map(c => c.charCodeAt(0) + 127397));
+    const flagSpan = document.createElement("span");
+    flagSpan.textContent = flag;
+    flagSpan.setAttribute("aria-hidden", "true");
+    subtitle.append(flagSpan);
+  }
+  if (country) {
+    const countrySpan = document.createElement("span");
+    countrySpan.textContent = country;
+    subtitle.append(countrySpan);
+  }
+  if (country && region) {
+    const separator = document.createElement("span");
+    separator.textContent = "›";
+    separator.setAttribute("aria-hidden", "true");
+    separator.className = "practice-region-separator";
+    subtitle.append(separator);
+  }
+  if (region) {
+    const regionSpan = document.createElement("span");
+    regionSpan.textContent = region;
+    subtitle.append(regionSpan);
+  }
+  subtitle.hidden = false;
 }
 
 function updateSeo(examInfo) {
@@ -44,6 +75,7 @@ function updateSeo(examInfo) {
     examHeading.textContent = examInfo.title;
     examHeading.hidden = false;
   }
+  renderExamRegion(examInfo);
   document.documentElement.lang = lang;
 
   document.querySelector('meta[name="description"]')
@@ -70,11 +102,11 @@ document.documentElement.lang = lang;
 
 document.querySelector("#choose-label").textContent = t.choose;
 document.querySelector("#question").textContent = t.loading;
-document.querySelector("#retry").textContent = t.retry;
+document.querySelector("#retry-text").textContent = t.retry;
 document.querySelector("#back-link").textContent = `← ${t.allExams}`;
 
-document.querySelector("#previous").textContent = t.previous;
-document.querySelector("#next").textContent = t.next;
+document.querySelector("#previous-text").textContent = t.previous;
+document.querySelector("#next-text").textContent = t.next;
 
 
 // Read exam slug from clean URL or legacy query parameters.
@@ -220,7 +252,6 @@ async function loadSet({ newSet = false } = {}) {
   }
   const data = await api(`/api/exams/${encodeURIComponent(exam)}/questions?${apiParams}`);
   if (!topic) {
-    if (Number.isFinite(Number(data.total_questions))) bankTotal = Number(data.total_questions);
     if (Number.isFinite(Number(data.question_count))) perSetCount = Number(data.question_count);
   }
   return data.questions || [];
@@ -343,7 +374,7 @@ function renderQuestionNavigator(followCurrent = true) {
   if (fill) fill.style.width = `${questions.length ? completedCount / questions.length * 100 : 0}%`;
   const track = document.querySelector(".practice-progress-track");
   if (track) track.setAttribute("aria-valuenow", String(questions.length ? Math.round(completedCount / questions.length * 100) : 0));
-  updateBankSummary();
+  updatePerSet();
 
   navContainer.replaceChildren();
 

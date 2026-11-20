@@ -41,11 +41,14 @@ function shuffle(items) {
 function getPublishedExam(db) {
   return db.prepare(`
     SELECT e.*, et.title, et.description, r.code AS region_code,
-           c.code AS country_code, c.name AS country_name
+           c.code AS country_code, COALESCE(ct.name, c.name) AS country_name,
+           COALESCE(rt.name, r.name) AS region_name
     FROM exams e
     JOIN exam_translations et ON et.exam_id = e.id AND et.language_code = ?
     LEFT JOIN regions r ON r.id = e.region_id
     LEFT JOIN countries c ON c.id = r.country_id
+    LEFT JOIN country_translations ct ON ct.country_id = c.id AND ct.language_code = ?
+    LEFT JOIN region_translations rt ON rt.region_id = r.id AND rt.language_code = ?
     WHERE e.slug = ? AND e.status = 'published'
   `);
 }
@@ -303,7 +306,7 @@ async function api(request, env) {
   const examMatch = path.match(/^\/api\/exams\/([a-z0-9-]+)$/);
   if (request.method === "GET" && examMatch) {
     const exam = await getPublishedExam(env.DB)
-      .bind(lang, examMatch[1])
+      .bind(lang, lang, lang, examMatch[1])
       .first();
     if (!exam) return json({ error: "Exam not found" }, 404);
     const topics = await env.DB.prepare(`
@@ -344,12 +347,6 @@ async function api(request, env) {
     if (!exam) return json({ error: "Exam not found" }, 404);
     const topicSlug = url.searchParams.get("topic");
     const perSet = Math.max(1, Math.min(1000, Number(exam.question_count) || 20));
-    const totalResult = !topicSlug ? await env.DB.prepare(`
-      SELECT COUNT(*) AS total FROM questions q
-      JOIN question_translations qt ON qt.question_id=q.id AND qt.language_code=?
-      WHERE q.exam_id=? AND q.status='published'
-    `).bind(lang, exam.id).first() : null;
-    const totalQuestions = Number(totalResult?.total || 0);
     const savedIds = (url.searchParams.get("ids") || "").split(",")
       .filter(id => /^\d+$/.test(id)).slice(0, perSet);
     const exclude = new Set((url.searchParams.get("exclude") || "").split(","));
@@ -369,7 +366,7 @@ async function api(request, env) {
           .concat(shuffle(all.filter(id => exclude.has(String(id)))))
           .slice(0, perSet);
       }
-      if (!ids.length) return json({ questions: [], question_count: perSet, total_questions: totalQuestions });
+      if (!ids.length) return json({ questions: [], question_count: perSet });
       const placeholders = ids.map(() => "?").join(",");
       const result = await env.DB.prepare(`
         SELECT q.id, q.difficulty, COALESCE(tt.name,'General') AS topic_name,
@@ -384,7 +381,7 @@ async function api(request, env) {
     } else {
       rows = await getQuestionRows(env.DB, exam.id, lang, topicSlug);
     }
-    if (!rows.length) return json({ questions: [], question_count: perSet, total_questions: totalQuestions });
+    if (!rows.length) return json({ questions: [], question_count: perSet });
     const ids = rows.map(q => q.id);
     const placeholders = ids.map(() => "?").join(",");
     const [optionResult,imageResult] = await Promise.all([
@@ -414,7 +411,7 @@ async function api(request, env) {
     const questions=rows.map(q=>({id:q.id,difficulty:q.difficulty,
       topic:q.topic_name,question:q.question_text,images:images.get(q.id)||[],
       options:options.get(q.id)||[]}));
-    return json({ questions, question_count: perSet, total_questions: totalQuestions });
+    return json({ questions, question_count: perSet });
   }
 
   const answerMatch = path.match(/^\/api\/questions\/(\d+)\/answer$/);
@@ -734,7 +731,7 @@ export default {
 
         if (examSlug) {
           const exam = await getPublishedExam(env.DB)
-            .bind(routeLang, examSlug)
+            .bind(routeLang, routeLang, routeLang, examSlug)
             .first();
 
           if (exam) {

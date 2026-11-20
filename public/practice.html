@@ -41,6 +41,7 @@
       </div>
       <div id="practice-set-actions" class="practice-set-actions" hidden>
         <span id="set-label" class="practice-set-label"></span>
+        <span id="practice-per-set" class="practice-per-set" hidden></span>
         <button id="another-set" class="secondary practice-another-set" type="button" disabled>
           <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m18 14 4 4-4 4"/><path d="m18 2 4 4-4 4"/><path d="M2 18h2c6 0 8-12 14-12h4"/><path d="M2 6h2c3 0 5 3 6 6"/><path d="M14 18h8"/></svg>
           <span id="another-set-label">Try Another Set</span>
@@ -52,17 +53,6 @@
           <div id="set-info-text" class="practice-set-help" role="tooltip"></div>
         </div>
       </div>
-    </div>
-    <div id="practice-bank-summary" class="practice-bank-summary" hidden>
-      <span class="practice-bank-stat">
-        <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v7c0 1.7 4 3 9 3s9-1.3 9-3V5M3 12v7c0 1.7 4 3 9 3s9-1.3 9-3v-7"/></svg>
-        <span id="practice-bank-total"></span>
-      </span>
-      <span class="practice-bank-divider" aria-hidden="true"></span>
-      <span class="practice-bank-stat">
-        <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m17 3 4 4-4 4"/><path d="M3 7h5c5 0 5 10 10 10h3"/><path d="m17 13 4 4-4 4"/><path d="M3 17h5c2 0 3-1 4-3"/><path d="M14 7h7"/></svg>
-        <span id="practice-bank-per-set"></span>
-      </span>
     </div>
   </div>
   <div class="practice-progress-heading">
@@ -80,12 +70,14 @@
       <fieldset id="options"><legend id="choose-label">Choose one answer</legend></fieldset>
     </form>
     <div id="feedback" class="feedback" hidden aria-live="polite"></div>
-<div class="nav-row">
-  <button class="secondary" id="previous" type="button">Previous</button>
-  <button class="secondary" id="retry" type="button">Retry</button>
-  <button class="primary" id="next" type="button">Next</button>
-</div>
   </section>
+<div class="nav-row practice-bottom-actions">
+  <button class="secondary" id="retry" type="button"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11a9 9 0 1 1 2.6 6.4"/><path d="M3 4v7h7"/></svg><span id="retry-text">Retry</span></button>
+  <div class="practice-bottom-right">
+  <button class="secondary" id="previous" type="button"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg><span id="previous-text">Previous</span></button>
+  <button class="primary" id="next" type="button"><span id="next-text">Next</span><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></button>
+  </div>
+</div>
 
 </main>
 

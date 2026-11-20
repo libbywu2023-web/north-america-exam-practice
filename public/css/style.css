@@ -1644,3 +1644,45 @@ body:has(#answer-form) .nav-row button:focus-visible {
   opacity: 1;
   cursor: not-allowed;
 }
+
+/* Iteration 2026-11-20: localized region, compact set controls, mockup-style bottom actions */
+.practice-heading-copy .practice-heading-subtitle {
+  display:flex;align-items:center;gap:9px;margin:8px 0 0;
+  color:#586e8d;font-size:15px;font-weight:500;
+}
+.practice-heading-copy .practice-heading-subtitle[hidden] { display:none!important; }
+.practice-region-separator { color:#8ba0b8;font-size:20px;line-height:1; }
+.practice-set-actions .practice-per-set {
+  color:#334b6c;font-size:14px;font-weight:550;white-space:nowrap;
+  padding-left:14px;border-left:1px solid #cbd7e7;
+}
+.practice-set-actions .practice-per-set[hidden] { display:none!important; }
+.practice-page-head { margin-bottom:24px; }
+body:has(.practice-page-head) .practice-bottom-actions {
+  display:flex;align-items:center;justify-content:space-between;gap:14px;
+  margin:20px 0 30px;padding:0;border:0;
+}
+body:has(.practice-page-head) .practice-bottom-right { display:flex;align-items:center;gap:14px;margin-left:auto; }
+body:has(.practice-page-head) .practice-bottom-actions button {
+  display:inline-flex;align-items:center;justify-content:center;gap:9px;
+  min-width:130px;min-height:46px;padding:10px 19px;
+  border-radius:11px;font-size:15px;font-weight:700;
+}
+body:has(.practice-page-head) .practice-bottom-actions #retry,
+body:has(.practice-page-head) .practice-bottom-actions #previous {
+  background:#fff;border:1.5px solid #1674ef;color:#1769c2;
+}
+body:has(.practice-page-head) .practice-bottom-actions #next {
+  background:#0969e5;border:1.5px solid #0969e5;color:#fff;
+}
+body:has(.practice-page-head) .practice-bottom-actions #next:hover:not(:disabled) { background:#075bc8;border-color:#075bc8; }
+body:has(.practice-page-head) .practice-bottom-actions button:disabled { opacity:.45;cursor:not-allowed; }
+@media(max-width:650px) {
+  .practice-set-actions .practice-per-set { padding-left:9px;font-size:12px; }
+  body:has(.practice-page-head) .practice-bottom-actions { gap:7px; }
+  body:has(.practice-page-head) .practice-bottom-right { gap:7px; }
+  body:has(.practice-page-head) .practice-bottom-actions button {
+    min-width:0;min-height:42px;padding:8px 10px;font-size:12px;gap:4px;
+  }
+  body:has(.practice-page-head) .practice-bottom-actions button svg { width:15px;height:15px; }
+}
