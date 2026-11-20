@@ -16,6 +16,7 @@ const homeCopy = {
     searchPlaceholder: "Search for exams...",
     searchAria: "Search exams",
     searchButton: "Search",
+    categoryHeading: "Browse by Exam Category", categoryAll: "All Exams", categoryDriving: "Driving Tests", categoryImmigration: "Immigration & Citizenship", categoryProfessional: "Professional Certification", categoryOther: "Other Exams",
     footerDescription: "Free online exam practice resources for learners worldwide.",
     about: "About",
     privacy: "Privacy Policy",
@@ -34,6 +35,7 @@ const homeCopy = {
     searchPlaceholder: "搜索考试...",
     searchAria: "搜索考试",
     searchButton: "搜索",
+    categoryHeading: "按考试类别浏览", categoryAll: "全部考试", categoryDriving: "驾驶考试", categoryImmigration: "移民与入籍", categoryProfessional: "职业资格认证", categoryOther: "其他考试",
     footerDescription: "为全球学习者提供免费的在线考试练习资源。",
     about: "关于我们",
     privacy: "隐私政策",
@@ -52,6 +54,7 @@ const homeCopy = {
     searchPlaceholder: "搜尋考試...",
     searchAria: "搜尋考試",
     searchButton: "搜尋",
+    categoryHeading: "依考試類別瀏覽", categoryAll: "全部考試", categoryDriving: "駕駛考試", categoryImmigration: "移民與入籍", categoryProfessional: "職業資格認證", categoryOther: "其他考試",
     footerDescription: "為全球學習者提供免費的線上考試練習資源。",
     about: "關於我們",
     privacy: "隱私權政策",
@@ -155,6 +158,41 @@ const countryFlags = {
 };
 
 let allExams = [];
+let activeCategory = "all";
+const categoryDefinitions = [
+  { slug: "all", label: "categoryAll", icon: "🌐" },
+  { slug: "driving", label: "categoryDriving", icon: "🚗" },
+  { slug: "immigration-citizenship", label: "categoryImmigration", icon: "🏛️" },
+  { slug: "professional-certification", label: "categoryProfessional", icon: "💼" },
+  { slug: "other", label: "categoryOther", icon: "📚" }
+];
+const knownCategorySlugs = new Set(categoryDefinitions.map(item => item.slug));
+function matchesCategory(exam, slug) {
+  if (slug === "all") return true;
+  if (slug === "other") return !knownCategorySlugs.has(exam.category_slug) || exam.category_slug === "other";
+  // Backwards compatibility for catalogs still carrying the legacy slug.
+  if (slug === "driving") return ["driving", "car-driving", "motorcycle", "truck-driving"].includes(exam.category_slug);
+  return exam.category_slug === slug;
+}
+const categoryRoot = document.querySelector("#category-filters");
+function renderCategories() {
+  if (!categoryRoot) return;
+  categoryRoot.replaceChildren();
+  const copy = homeCopy[lang] || homeCopy.en;
+  for (const category of categoryDefinitions) {
+    const count = allExams.filter(exam => matchesCategory(exam, category.slug)).length;
+    const button = createElement("button", "category-filter", `${category.icon}  ${copy[category.label]} (${count})`);
+    button.type = "button";
+    button.dataset.category = category.slug;
+    button.setAttribute("aria-pressed", String(activeCategory === category.slug));
+    button.addEventListener("click", () => {
+      activeCategory = category.slug;
+      renderCategories();
+      renderCatalog(searchInput?.value || "");
+    });
+    categoryRoot.append(button);
+  }
+}
 
 function createElement(tag, className, text) {
   const element = document.createElement(tag);
@@ -183,14 +221,10 @@ function createExamLink(exam) {
     link.href = `/${slug}`;
   }
 
-  // A subtle NEW indicator for recently published questions (14 days).
-  if (exam.latest_question_at) {
-    const timestamp = Date.parse(exam.latest_question_at.replace(" ", "T") + "Z");
-    if (Number.isFinite(timestamp) && timestamp <= Date.now() &&
-        Date.now() - timestamp < 14 * 86400000) {
-      const badge = createElement("span", "catalog-new-badge", "NEW");
-      link.append(document.createTextNode(" "), badge);
-    }
+  // NEW is controlled manually in the exam admin settings.
+  if (Number(exam.show_new_badge) === 1) {
+    const badge = createElement("span", "catalog-new-badge", "NEW");
+    link.append(document.createTextNode(" "), badge);
   }
   return link;
 }
@@ -254,11 +288,10 @@ function renderCatalog(query = "") {
 
   const keyword = query.trim().toLowerCase();
 
-  const filteredExams = keyword
-    ? allExams.filter(exam =>
-        getSearchText(exam).includes(keyword)
-      )
-    : allExams;
+  const filteredExams = allExams.filter(exam =>
+    matchesCategory(exam, activeCategory) &&
+    (!keyword || getSearchText(exam).includes(keyword))
+  );
 
   if (filteredExams.length === 0) {
     root.append(
@@ -310,14 +343,12 @@ function renderCatalog(query = "") {
       const regionName = createElement(
         "div",
         "catalog-region-name",
-        region.code === "ALL" ? "" : region.name
+        region.code === "ALL" ? (lang === "en" ? "National" : lang === "zh-CN" ? "全国" : "全國") : region.name
       );
 
       const examsContainer = createElement(
         "div",
-        region.code === "ALL"
-          ? "catalog-all-exams"
-          : "catalog-region-exams"
+        "catalog-region-exams"
       );
 
       renderExamPreview(
@@ -333,7 +364,7 @@ function renderCatalog(query = "") {
     root.append(section);
   });
 
-  if (!keyword) {
+  if (!keyword && activeCategory === "all") {
     const otherCard = createElement(
       "section",
       "catalog-country catalog-other-countries"
@@ -367,6 +398,7 @@ async function init() {
 
     allExams = result.exams || [];
 
+    renderCategories();
     renderCatalog();
 
     searchInput.addEventListener("input", () => {

@@ -74,6 +74,7 @@ function validateExamFields(body) {
   const passingScore = Number(body.passing_score_percent);
 
   const status = body.status;
+  const showNewBadge = body.show_new_badge === true;
   const defaultLanguage = body.default_language;
 
   if (!Number.isInteger(regionId) || regionId <= 0) {
@@ -120,7 +121,8 @@ function validateExamFields(body) {
       timeLimit,
       passingScore,
       status,
-      defaultLanguage
+      defaultLanguage,
+      showNewBadge
     }
   };
 }
@@ -168,6 +170,7 @@ async function listExams(env) {
         e.category_id,
         e.slug,
         e.status,
+        e.show_new_badge,
         e.default_language,
         e.question_count,
         e.time_limit_minutes,
@@ -276,7 +279,8 @@ async function createExam(request, env) {
     timeLimit,
     passingScore,
     status,
-    defaultLanguage
+    defaultLanguage,
+    showNewBadge
   } = fields.values;
 
   const relation = await validateRelations(env, regionId, categoryId);
@@ -311,9 +315,10 @@ async function createExam(request, env) {
         default_language,
         question_count,
         time_limit_minutes,
-        passing_score_percent
+        passing_score_percent,
+        show_new_badge
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).bind(
       regionId,
       categoryId,
@@ -322,7 +327,8 @@ async function createExam(request, env) {
       defaultLanguage,
       questionCount,
       timeLimit,
-      passingScore
+      passingScore,
+      showNewBadge ? 1 : 0
     ),
 
     ...languages.map(language =>
@@ -413,7 +419,8 @@ async function updateExam(id, request, env) {
     timeLimit,
     passingScore,
     status,
-    defaultLanguage
+    defaultLanguage,
+    showNewBadge
   } = fields.values;
 
   const existing = await env.DB.prepare(`
@@ -459,7 +466,8 @@ async function updateExam(id, request, env) {
         default_language = ?,
         question_count = ?,
         time_limit_minutes = ?,
-        passing_score_percent = ?
+        passing_score_percent = ?,
+        show_new_badge = ?
       WHERE id = ?
     `).bind(
       regionId,
@@ -470,6 +478,7 @@ async function updateExam(id, request, env) {
       questionCount,
       timeLimit,
       passingScore,
+      showNewBadge ? 1 : 0,
       id
     ),
 

@@ -90,9 +90,7 @@ async function listCatalogExams(db, lang) {
       e.question_count,
       e.time_limit_minutes,
       e.passing_score_percent,
-      COALESCE(e.content_updated_at,
-        (SELECT MAX(q.created_at) FROM questions q
-         WHERE q.exam_id=e.id AND q.status='published')) AS latest_question_at
+      e.show_new_badge
 
     FROM exams e
 

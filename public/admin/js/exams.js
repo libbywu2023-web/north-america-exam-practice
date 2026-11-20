@@ -222,6 +222,7 @@ function openModal(exam = null) {
   document.getElementById("exam-id").value = exam?.id || "";
   document.getElementById("exam-slug").value = exam?.slug || "";
   document.getElementById("exam-status").value = exam?.status || "draft";
+  document.getElementById("exam-show-new-badge").checked = Number(exam?.show_new_badge) === 1;
   document.getElementById("exam-question-count").value =
     exam?.question_count ?? 50;
   document.getElementById("exam-time-limit").value =
@@ -292,6 +293,7 @@ async function saveExam(event) {
     category_id: Number(document.getElementById("exam-category").value),
     slug: document.getElementById("exam-slug").value.trim(),
     status: document.getElementById("exam-status").value,
+    show_new_badge: document.getElementById("exam-show-new-badge").checked,
     default_language: document.getElementById("exam-default-language").value,
     question_count: Number(document.getElementById("exam-question-count").value),
     time_limit_minutes: timeValue === "" ? null : Number(timeValue),

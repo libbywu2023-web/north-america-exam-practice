@@ -1686,3 +1686,13 @@ body:has(.practice-page-head) .practice-bottom-actions button:disabled { opacity
   }
   body:has(.practice-page-head) .practice-bottom-actions button svg { width:15px;height:15px; }
 }
+
+/* Category browser: lightweight, client-side filtering of the existing catalog */
+.homepage .category-browser { position: relative; z-index: 2; max-width: 1120px; margin: 18px auto 22px; }
+.homepage .category-browser h2 { font-size: 20px; color: #123765; margin: 0 0 12px; }
+.homepage .category-filters { display: flex; flex-wrap: wrap; gap: 10px; }
+.homepage .category-filter { cursor: pointer; border: 1px solid #d7e5f5; border-radius: 10px; background: rgba(255,255,255,.94); color: #17365f; font: inherit; font-size: 14px; font-weight: 650; padding: 12px 16px; }
+.homepage .category-filter:hover { border-color: #2672c7; background: #f0f7ff; }
+.homepage .category-filter[aria-pressed="true"] { background: #1769c2; color: #fff; border-color: #1769c2; }
+.homepage .category-filter:focus-visible { outline: 3px solid #f0a323; outline-offset: 2px; }
+@media(max-width: 600px) { .homepage .category-browser { margin: 16px auto; } .homepage .category-filter { padding: 10px 12px; font-size: 13px; } }
