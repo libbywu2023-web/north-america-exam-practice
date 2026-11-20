@@ -17,12 +17,61 @@
   <link rel="stylesheet" href="/css/style.css">
 </head>
 <body>
-<header class="topbar"><a class="brand" href="/">Global Exam Practice</a><select id="language" aria-label="Language"><option value="en">English</option><option value="zh-CN">简体中文</option><option value="zh-TW">繁體中文</option></select></header>
+<header class="topbar site-header">
+  <a class="brand" href="/" aria-label="Global Exam Practice Home">
+    <svg class="brand-icon" viewBox="0 0 48 48" aria-hidden="true">
+      <path d="M3 17 24 7l21 10-21 10L3 17Z" fill="#1769c2"/>
+      <path d="M12 22v10c7 7 17 7 24 0V22l-12 7-12-7Z" fill="#123765"/>
+      <path d="M44 18v13" stroke="#e6a52e" stroke-width="2.5" stroke-linecap="round"/>
+      <circle cx="44" cy="33" r="2.5" fill="#e6a52e"/>
+    </svg>
+    <span>Global Exam Practice</span>
+  </a>
+  <label class="language-picker"><span class="sr-only">Language</span>
+    <select id="language" aria-label="Language"><option value="en">English</option><option value="zh-CN">简体中文</option><option value="zh-TW">繁體中文</option></select>
+  </label>
+</header>
 <main class="container">
-  <a class="back-link" href="/" id="back-link">← All exams</a>
-<div class="progress-row">
-  <span id="counter">Completed 0/0</span>
-</div>
+  <div class="practice-page-head">
+    <a class="back-link practice-back" href="/" id="back-link">← All exams</a>
+    <div class="practice-heading-row">
+      <div class="practice-heading-copy">
+        <h2 id="practice-exam-title" class="practice-exam-title" hidden></h2>
+        <p id="practice-heading-subtitle" class="practice-heading-subtitle" hidden></p>
+      </div>
+      <div id="practice-set-actions" class="practice-set-actions" hidden>
+        <span id="set-label" class="practice-set-label"></span>
+        <button id="another-set" class="secondary practice-another-set" type="button" disabled>
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m18 14 4 4-4 4"/><path d="m18 2 4 4-4 4"/><path d="M2 18h2c6 0 8-12 14-12h4"/><path d="M2 6h2c3 0 5 3 6 6"/><path d="M14 18h8"/></svg>
+          <span id="another-set-label">Try Another Set</span>
+        </button>
+        <div class="practice-tooltip-wrap">
+          <button id="set-info" class="practice-set-info" type="button" aria-label="About practice sets" aria-expanded="false" aria-describedby="set-info-text">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M12 7v6M12 17h.01"/></svg>
+          </button>
+          <div id="set-info-text" class="practice-set-help" role="tooltip"></div>
+        </div>
+      </div>
+    </div>
+    <div id="practice-bank-summary" class="practice-bank-summary" hidden>
+      <span class="practice-bank-stat">
+        <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v7c0 1.7 4 3 9 3s9-1.3 9-3V5M3 12v7c0 1.7 4 3 9 3s9-1.3 9-3v-7"/></svg>
+        <span id="practice-bank-total"></span>
+      </span>
+      <span class="practice-bank-divider" aria-hidden="true"></span>
+      <span class="practice-bank-stat">
+        <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m17 3 4 4-4 4"/><path d="M3 7h5c5 0 5 10 10 10h3"/><path d="m17 13 4 4-4 4"/><path d="M3 17h5c2 0 3-1 4-3"/><path d="M14 7h7"/></svg>
+        <span id="practice-bank-per-set"></span>
+      </span>
+    </div>
+  </div>
+  <div class="practice-progress-heading">
+    <strong id="practice-question-position"></strong>
+    <span id="counter">Completed 0/0</span>
+  </div>
+  <div class="practice-progress-track" role="progressbar" aria-label="Questions answered" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+    <span id="practice-progress-fill"></span>
+  </div>
 <div id="question-navigator" class="question-navigator" aria-label="Question navigation"></div>
   <section class="quiz-card">
     <div id="question-images" class="question-images" hidden aria-label="Question images"></div>
@@ -37,6 +86,7 @@
   <button class="primary" id="next" type="button">Next</button>
 </div>
   </section>
+
 </main>
 
 <dialog id="image-preview" class="image-preview">

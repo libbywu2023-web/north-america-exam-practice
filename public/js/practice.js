@@ -2,6 +2,22 @@ import { api, copy, getLanguage, setLanguageSelect } from "./common.js";
 
 const lang = getLanguage();
 const t = copy[lang];
+const practiceLabels = {
+  en: { position: (n,total) => `Question ${n} of ${total}`, bank: n => `${n} questions in bank`, perSet: n => `${n} questions per set` },
+  "zh-CN": { position: (n,total) => `第 ${n} / ${total} 题`, bank: n => `题库共 ${n} 题`, perSet: n => `每组 ${n} 题` },
+  "zh-TW": { position: (n,total) => `第 ${n} / ${total} 題`, bank: n => `題庫共 ${n} 題`, perSet: n => `每組 ${n} 題` }
+}[lang] || { position: (n,total) => `Question ${n} of ${total}`, bank: n => `${n} questions in bank`, perSet: n => `${n} questions per set` };
+let bankTotal = null;
+let perSetCount = null;
+function updateBankSummary() {
+  const summary = document.querySelector("#practice-bank-summary");
+  if (!summary || topic || !questions.length) return;
+  const total = bankTotal ?? questions.length;
+  document.querySelector("#practice-bank-total").textContent = practiceLabels.bank(total);
+  document.querySelector("#practice-bank-per-set").textContent = practiceLabels.perSet(perSetCount || questions.length);
+  summary.hidden = false;
+}
+
 function updateSeo(examInfo) {
   const title = `${examInfo.title} | Exam Practice`;
   const description = examInfo.description ||
@@ -23,6 +39,11 @@ function updateSeo(examInfo) {
   };
 
   document.title = title;
+  const examHeading = document.querySelector("#practice-exam-title");
+  if (examHeading && examInfo.title) {
+    examHeading.textContent = examInfo.title;
+    examHeading.hidden = false;
+  }
   document.documentElement.lang = lang;
 
   document.querySelector('meta[name="description"]')
@@ -83,6 +104,9 @@ exam = exam || params.get("exam") || "bc-class-7l";
 const topic = params.get("topic");
 
 let questions = [];
+let setNumber = 1;
+let usedQuestionIds = [];
+let isLoadingSet = false;
 
 
 const practiceStateKey = `practice-state:${exam}:${topic || "all"}`;
@@ -101,6 +125,8 @@ function loadPracticeState() {
       answers: saved.answers && typeof saved.answers === "object"
         ? saved.answers
         : {},
+      setNumber: Number.isInteger(saved.setNumber) && saved.setNumber > 0 ? saved.setNumber : 1,
+      usedQuestionIds: Array.isArray(saved.usedQuestionIds) ? saved.usedQuestionIds.map(String) : [],
       questionIds: Array.isArray(saved.questionIds)
         ? saved.questionIds.map(String)
         : []
@@ -111,6 +137,8 @@ function loadPracticeState() {
 }
 
 const practiceState = loadPracticeState();
+setNumber = practiceState.setNumber || 1;
+usedQuestionIds = practiceState.usedQuestionIds || [];
 let index = practiceState.index;
 
 // Store each question's answer and feedback.
@@ -121,6 +149,8 @@ function savePracticeState() {
     practiceStateKey,
     JSON.stringify({
       index,
+      setNumber,
+      usedQuestionIds,
       answers: Object.fromEntries(answerResults),
       questionIds: questions.map(question => String(question.id))
     })
@@ -166,8 +196,7 @@ function restoreQuestionOrder(items, savedIds) {
     }
   });
 
-  // Append any newly available questions without disturbing the saved order.
-  ordered.push(...questionsById.values());
+  // Retry/restore must not silently append newly published questions.
   return ordered;
 }
 
@@ -179,45 +208,37 @@ let navStart = 0;
 const navContainer = document.querySelector("#question-navigator");
 const rootOptions = document.querySelector("#options");
 
-// Build API URL
-const apiParams = new URLSearchParams({ lang });
-
-if (topic) {
-  apiParams.set("topic", topic);
+// Fetch only the current practice set. Topic practice retains its own selection rules.
+async function loadSet({ newSet = false } = {}) {
+  const apiParams = new URLSearchParams({ lang });
+  if (topic) apiParams.set("topic", topic);
+  if (!topic && !newSet && practiceState.questionIds.length) {
+    apiParams.set("ids", practiceState.questionIds.join(","));
+  }
+  if (!topic && newSet && usedQuestionIds.length) {
+    apiParams.set("exclude", usedQuestionIds.join(","));
+  }
+  const data = await api(`/api/exams/${encodeURIComponent(exam)}/questions?${apiParams}`);
+  if (!topic) {
+    if (Number.isFinite(Number(data.total_questions))) bankTotal = Number(data.total_questions);
+    if (Number.isFinite(Number(data.question_count))) perSetCount = Number(data.question_count);
+  }
+  return data.questions || [];
 }
 
 try {
-  const data = await api(
-    `/api/exams/${encodeURIComponent(exam)}/questions?${apiParams.toString()}`
-  );
-
-  questions = data.questions || [];
-
-  // Restore the saved question order, or randomize the first practice session.
-  questions = restoreQuestionOrder(
-    questions,
-    practiceState.questionIds
-  );
-
-  // Persist the initial randomized order immediately, before any answer is submitted.
+  questions = await loadSet();
+  if (!questions.length) throw new Error(t.noQuestions);
+  if (!topic && !practiceState.questionIds.length) {
+    usedQuestionIds = [...new Set([...usedQuestionIds, ...questions.map(q => String(q.id))])];
+  }
+  index = Math.min(index, questions.length - 1);
   savePracticeState();
 
-  // Load exam information for SEO.
-  try {
-    const examData = await api(
-      `/api/exams/${encodeURIComponent(exam)}?lang=${encodeURIComponent(lang)}`
-    );
-
-    if (examData.exam) {
-      updateSeo(examData.exam);
-    }
-  } catch (seoError) {
-    console.warn("Failed to load exam SEO information:", seoError);
-  }
-
-  if (!questions.length) {
-    throw new Error(t.noQuestions);
-  }
+  // SEO is non-critical: never hold up the first question waiting for it.
+  api(`/api/exams/${encodeURIComponent(exam)}?lang=${encodeURIComponent(lang)}`)
+    .then(data => { if (data.exam) updateSeo(data.exam); })
+    .catch(error => console.warn("Exam SEO metadata unavailable:", error));
 
   // Restore submitted answers using the current language.
   await Promise.allSettled(
@@ -316,6 +337,13 @@ function renderQuestionNavigator(followCurrent = true) {
 
   document.querySelector("#counter").textContent =
     `${t.completed} ${completedCount}/${questions.length}`;
+  const position = document.querySelector("#practice-question-position");
+  if (position) position.textContent = practiceLabels.position(index + 1, questions.length);
+  const fill = document.querySelector("#practice-progress-fill");
+  if (fill) fill.style.width = `${questions.length ? completedCount / questions.length * 100 : 0}%`;
+  const track = document.querySelector(".practice-progress-track");
+  if (track) track.setAttribute("aria-valuenow", String(questions.length ? Math.round(completedCount / questions.length * 100) : 0));
+  updateBankSummary();
 
   navContainer.replaceChildren();
 
@@ -413,6 +441,17 @@ function render() {
   const savedAnswer = savedResult?.selectedOptionId;
 
   renderQuestionNavigator();
+  const another = document.querySelector("#another-set");
+  const setActions = document.querySelector("#practice-set-actions");
+  if (setActions) setActions.hidden = Boolean(topic) || !questions.length;
+  if (another) {
+    const complete = questions.length > 0 && questions.every(q =>
+      (answerResults.get(String(q.id)) || answerResults.get(q.id))?.submitted);
+    another.disabled = isLoadingSet || !complete;
+  }
+  const setLabel = document.querySelector("#set-label");
+  if (setLabel) setLabel.textContent = topic ? "" :
+    ({en:`Set ${setNumber}`,"zh-CN":`第 ${setNumber} 组`,"zh-TW":`第 ${setNumber} 組`}[lang]);
 
   renderQuestionImages(q.images || []);
 
@@ -581,9 +620,58 @@ document.querySelector("#retry").addEventListener("click", () => {
   index = 0;
   navStart = 0;
 
-  // A confirmed retry starts a fresh randomized question order.
-  questions = shuffleQuestions(questions, true);
+  // Retry preserves the exact question IDs and their order.
 
   savePracticeState();
   render();
+});
+// A new set is available only after every question has been answered.
+const anotherSetButton = document.querySelector("#another-set");
+if (anotherSetButton) document.querySelector("#another-set-label").textContent = ({
+  en: "Try Another Set", "zh-CN": "再做一组新题", "zh-TW": "再做一組新題"
+})[lang];
+const setInfo = document.querySelector("#set-info");
+const setHelp = document.querySelector("#set-info-text");
+if (setHelp) setHelp.textContent = ({
+  en: "Answer every question in this set to unlock the next set. Correct answers are not required. Each new set is randomly selected, so some questions may repeat.",
+  "zh-CN": "完成当前组的全部题目后即可解锁下一组，无论答对或答错。每组随机抽题，因此可能有少量题目重复。",
+  "zh-TW": "完成目前組的全部題目後即可解鎖下一組，無論答對或答錯。每組隨機抽題，因此可能有少量題目重複。"
+})[lang];
+if (setInfo) setInfo.setAttribute("aria-label", ({
+  en: "About practice sets", "zh-CN": "关于练习题组", "zh-TW": "關於練習題組"
+})[lang]);
+setInfo?.addEventListener("click", () => {
+  if (!setHelp) return;
+  setHelp.hidden = !setHelp.hidden;
+  setInfo.setAttribute("aria-expanded", String(!setHelp.hidden));
+});
+anotherSetButton?.addEventListener("click", async () => {
+  if (isLoadingSet || topic || !questions.length ||
+      !questions.every(q => (answerResults.get(String(q.id)) || answerResults.get(q.id))?.submitted)) return;
+  const message = ({en:"Start another random set? Some questions may repeat.",
+    "zh-CN":"开始另一组随机题目？部分题目可能重复。",
+    "zh-TW":"開始另一組隨機題目？部分題目可能重複。"})[lang];
+  if (!confirm(message)) return;
+  isLoadingSet = true;
+  anotherSetButton.disabled = true;
+  try {
+    // Include the current set when prioritizing questions not previously seen.
+    usedQuestionIds = [...new Set([...usedQuestionIds,...questions.map(q=>String(q.id))])];
+    const next = await loadSet({newSet:true});
+    if (!next.length) throw new Error(t.noQuestions);
+    questions = next;
+    setNumber++;
+    index = 0;
+    navStart = 0;
+    answerResults.clear();
+    usedQuestionIds = [...new Set([...usedQuestionIds,...next.map(q=>String(q.id))])];
+    savePracticeState();
+    render();
+    window.scrollTo({top:0,behavior:"smooth"});
+  } catch(error) {
+    alert(error.message);
+  } finally {
+    isLoadingSet = false;
+    render();
+  }
 });

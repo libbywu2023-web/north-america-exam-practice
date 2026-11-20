@@ -183,6 +183,15 @@ function createExamLink(exam) {
     link.href = `/${slug}`;
   }
 
+  // A subtle NEW indicator for recently published questions (14 days).
+  if (exam.latest_question_at) {
+    const timestamp = Date.parse(exam.latest_question_at.replace(" ", "T") + "Z");
+    if (Number.isFinite(timestamp) && timestamp <= Date.now() &&
+        Date.now() - timestamp < 14 * 86400000) {
+      const badge = createElement("span", "catalog-new-badge", "NEW");
+      link.append(document.createTextNode(" "), badge);
+    }
+  }
   return link;
 }
 

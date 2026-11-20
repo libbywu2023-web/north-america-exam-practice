@@ -86,7 +86,10 @@ async function listCatalogExams(db, lang) {
 
       e.question_count,
       e.time_limit_minutes,
-      e.passing_score_percent
+      e.passing_score_percent,
+      COALESCE(e.content_updated_at,
+        (SELECT MAX(q.created_at) FROM questions q
+         WHERE q.exam_id=e.id AND q.status='published')) AS latest_question_at
 
     FROM exams e
 
@@ -336,26 +339,82 @@ async function api(request, env) {
   const questionsMatch = path.match(/^\/api\/exams\/([a-z0-9-]+)\/questions$/);
   if (request.method === "GET" && questionsMatch) {
     const exam = await env.DB.prepare(
-      "SELECT id FROM exams WHERE slug = ? AND status = 'published'"
+      "SELECT id, question_count FROM exams WHERE slug = ? AND status = 'published'"
     ).bind(questionsMatch[1]).first();
     if (!exam) return json({ error: "Exam not found" }, 404);
-    const rows = await getQuestionRows(
-      env.DB, exam.id, lang, url.searchParams.get("topic")
-    );
-    const imagesByQuestion = await getExamQuestionImages(env.DB, exam.id);
-
-    const questions = [];
-    for (const row of rows) {
-      questions.push({
-        id: row.id,
-        difficulty: row.difficulty,
-        topic: row.topic_name,
-        question: row.question_text,
-        images: imagesByQuestion.get(row.id) || [],
-        options: await questionOptions(env.DB, row.id, lang)
-      });
+    const topicSlug = url.searchParams.get("topic");
+    const perSet = Math.max(1, Math.min(1000, Number(exam.question_count) || 20));
+    const totalResult = !topicSlug ? await env.DB.prepare(`
+      SELECT COUNT(*) AS total FROM questions q
+      JOIN question_translations qt ON qt.question_id=q.id AND qt.language_code=?
+      WHERE q.exam_id=? AND q.status='published'
+    `).bind(lang, exam.id).first() : null;
+    const totalQuestions = Number(totalResult?.total || 0);
+    const savedIds = (url.searchParams.get("ids") || "").split(",")
+      .filter(id => /^\d+$/.test(id)).slice(0, perSet);
+    const exclude = new Set((url.searchParams.get("exclude") || "").split(","));
+    let rows;
+    if (!topicSlug) {
+      let ids;
+      if (savedIds.length) {
+        ids = [...new Set(savedIds)];
+      } else {
+        const available = await env.DB.prepare(`
+          SELECT q.id FROM questions q
+          JOIN question_translations qt ON qt.question_id=q.id AND qt.language_code=?
+          WHERE q.exam_id=? AND q.status='published' ORDER BY q.id
+        `).bind(lang, exam.id).all();
+        const all = (available.results || []).map(q => q.id);
+        ids = shuffle(all.filter(id => !exclude.has(String(id))))
+          .concat(shuffle(all.filter(id => exclude.has(String(id)))))
+          .slice(0, perSet);
+      }
+      if (!ids.length) return json({ questions: [], question_count: perSet, total_questions: totalQuestions });
+      const placeholders = ids.map(() => "?").join(",");
+      const result = await env.DB.prepare(`
+        SELECT q.id, q.difficulty, COALESCE(tt.name,'General') AS topic_name,
+               qt.question_text FROM questions q
+        JOIN question_translations qt ON qt.question_id=q.id AND qt.language_code=?
+        LEFT JOIN topics t ON t.id=q.topic_id
+        LEFT JOIN topic_translations tt ON tt.topic_id=t.id AND tt.language_code=?
+        WHERE q.exam_id=? AND q.status='published' AND q.id IN (${placeholders})
+      `).bind(lang,lang,exam.id,...ids).all();
+      const byId = new Map((result.results || []).map(q => [String(q.id),q]));
+      rows = ids.map(id => byId.get(String(id))).filter(Boolean);
+    } else {
+      rows = await getQuestionRows(env.DB, exam.id, lang, topicSlug);
     }
-    return json({ questions });
+    if (!rows.length) return json({ questions: [], question_count: perSet, total_questions: totalQuestions });
+    const ids = rows.map(q => q.id);
+    const placeholders = ids.map(() => "?").join(",");
+    const [optionResult,imageResult] = await Promise.all([
+      env.DB.prepare(`
+        SELECT qo.question_id,qo.id,qo.option_key,qo.sort_order,ot.option_text
+        FROM question_options qo JOIN option_translations ot
+          ON ot.option_id=qo.id AND ot.language_code=?
+        WHERE qo.question_id IN (${placeholders})
+        ORDER BY qo.question_id,qo.sort_order
+      `).bind(lang,...ids).all(),
+      env.DB.prepare(`
+        SELECT question_id,image_url,alt_text,sort_order FROM question_images
+        WHERE question_id IN (${placeholders}) ORDER BY question_id,sort_order
+      `).bind(...ids).all()
+    ]);
+    const options=new Map(),images=new Map();
+    for(const o of optionResult.results || []) {
+      if(!options.has(o.question_id)) options.set(o.question_id,[]);
+      options.get(o.question_id).push({id:o.id,option_key:o.option_key,
+        sort_order:o.sort_order,option_text:o.option_text});
+    }
+    for(const img of imageResult.results || []) {
+      if(!images.has(img.question_id)) images.set(img.question_id,[]);
+      images.get(img.question_id).push({url:img.image_url,alt:img.alt_text,
+        sort_order:img.sort_order});
+    }
+    const questions=rows.map(q=>({id:q.id,difficulty:q.difficulty,
+      topic:q.topic_name,question:q.question_text,images:images.get(q.id)||[],
+      options:options.get(q.id)||[]}));
+    return json({ questions, question_count: perSet, total_questions: totalQuestions });
   }
 
   const answerMatch = path.match(/^\/api\/questions\/(\d+)\/answer$/);

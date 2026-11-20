@@ -1524,3 +1524,123 @@ body:has(#catalog) .container {
     margin-bottom: 3px;
   }
 }
+
+/* Practice set controls and recent-content indicator */
+.practice-set-label { font-size: .85rem; color: #64748b; margin-left: auto; }
+.another-set-panel { margin: 18px 0 28px; text-align: center; }
+.another-set-panel [hidden] { display: none !important; }
+.catalog-new-badge { display: inline-block; vertical-align: middle; font-size: .62rem;
+  font-weight: 750; letter-spacing: .035em; color: #087c51; background: #e1f7ed;
+  padding: 2px 5px; border-radius: 4px; text-decoration: none; }
+
+/* Practice header matches the homepage brand, without enlarging the quiz header. */
+body:has(#practice-exam-title) .topbar .brand { display:inline-flex; align-items:center; gap:10px; color:#123765; font-size:21px; font-weight:750; white-space:nowrap; }
+body:has(#practice-exam-title) .topbar .brand-icon { display:block; width:42px; height:42px; flex:0 0 auto; }
+.practice-exam-title { max-width:760px; margin:0 auto 16px; color:#172b45; font-size:clamp(19px,3vw,25px); line-height:1.35; }
+@media(max-width:600px) { body:has(#practice-exam-title) .topbar .brand { font-size:17px; } body:has(#practice-exam-title) .topbar .brand-icon { width:32px; height:32px; } }
+
+/* Practice set controls: keep the next-set affordance visible but locked. */
+.practice-set-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-left: auto; flex-wrap: wrap; }
+.practice-set-actions[hidden], .practice-set-help[hidden] { display: none !important; }
+.practice-set-actions .practice-set-label { margin-left: 0; white-space: nowrap; }
+.practice-set-actions .practice-another-set { padding: 7px 11px; font-size: .83rem; }
+.practice-set-actions .practice-another-set:disabled { opacity: .48; cursor: not-allowed; }
+.practice-set-info { background: transparent; border: 0; padding: 3px; color: #64748b; font-size: 1.3rem; cursor: pointer; line-height: 1; }
+.practice-set-info:hover, .practice-set-info:focus-visible { color: #1769c2; }
+.practice-set-help { margin: 8px 0 16px auto; max-width: 540px; background: #f1f5f9; border-radius: 8px; padding: 12px 14px; font-size: .88rem; line-height: 1.55; color: #334155; }
+@media (max-width: 600px) { .progress-row { flex-wrap: wrap; gap: 8px; } .practice-set-actions { width: 100%; justify-content: flex-end; } }
+
+/* ExamHere practice page: compact, blue-accented exam header */
+body:has(#practice-page-head) .container,
+body:has(.practice-page-head) .container { max-width:1080px; }
+.practice-page-head { margin-bottom:22px; }
+.practice-back { display:inline-flex!important;align-items:center;gap:6px;margin-bottom:13px!important;color:#1769c2!important;font-size:14px!important;font-weight:650;text-decoration:none!important; }
+.practice-back:hover { text-decoration:underline!important; }
+.practice-heading-row { display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap; }
+.practice-heading-copy { border-left:4px solid #1674ef;padding-left:16px;min-width:0;flex:1 1 340px; }
+.practice-heading-copy .practice-exam-title { max-width:none;margin:0!important;font-size:clamp(21px,2.8vw,29px);line-height:1.25;letter-spacing:-.025em;color:#142c50;font-weight:750; }
+.practice-heading-subtitle { margin:4px 0 0;color:#62748b;font-size:13px; }
+.practice-set-actions { margin-left:0;gap:9px;flex:0 1 auto; }
+.practice-set-actions .practice-set-label { border-radius:999px;background:#e6f1ff;color:#1167c5;padding:7px 16px;font-size:14px;font-weight:750; }
+.practice-set-actions .practice-another-set { display:inline-flex;align-items:center;gap:7px;border-radius:10px;padding:9px 12px;background:#f4f8ff;border-color:#d6e3f3;color:#1769c2; }
+.practice-set-actions .practice-another-set:disabled { opacity:1;background:#f1f3f7;color:#9aa7b8;border-color:#e6ebf1; }
+.practice-set-actions .practice-set-info { color:#1674ef;display:grid;place-items:center;border:0;background:transparent;padding:4px; }
+.practice-tooltip-wrap { position:relative;display:flex;align-items:center; }
+.practice-tooltip-wrap .practice-set-help { display:none;position:absolute;right:0;top:calc(100% + 12px);width:min(340px,80vw);max-width:none;margin:0;z-index:30;background:white;color:#263b59;border:1px solid #d5e0ee;box-shadow:0 8px 24px #1a35551f;border-radius:12px;padding:14px 16px;font-size:13px;line-height:1.55;font-weight:400; }
+.practice-tooltip-wrap .practice-set-help::before { content:"";position:absolute;right:9px;top:-7px;width:12px;height:12px;background:#fff;border-left:1px solid #d5e0ee;border-top:1px solid #d5e0ee;transform:rotate(45deg); }
+.practice-tooltip-wrap:hover .practice-set-help,.practice-tooltip-wrap:focus-within .practice-set-help,.practice-tooltip-wrap.is-open .practice-set-help { display:block; }
+.practice-bank-summary { display:flex;align-items:center;gap:22px;flex-wrap:wrap;margin-top:20px;padding:13px 18px;background:#eaf4ff;border-radius:12px;color:#18365c; }
+.practice-bank-summary[hidden] { display:none!important; }
+.practice-bank-stat { display:inline-flex;align-items:center;gap:10px;font-size:14px; }
+.practice-bank-stat svg { color:#1373e8;flex-shrink:0; }
+.practice-bank-divider { height:23px;border-left:1px solid #c9daed; }
+.practice-progress-heading { display:flex;justify-content:space-between;align-items:center;gap:10px;margin:18px 0 9px; }
+.practice-progress-heading strong { color:#172b45;font-size:16px; }
+.practice-progress-heading #counter { color:#62748b;font-size:13px;font-weight:500; }
+.practice-progress-track { height:7px;background:#e2eaf4;border-radius:99px;overflow:hidden;margin-bottom:21px; }
+.practice-progress-track span { display:block;width:0;height:100%;background:#1477ed;border-radius:99px;transition:width .2s ease; }
+body:has(.practice-page-head) .quiz-card { max-width:none; }
+@media(max-width:650px) {
+ .practice-heading-row { align-items:flex-start; }
+ .practice-heading-copy { flex-basis:100%; }
+ .practice-set-actions { width:100%;justify-content:flex-start; }
+ .practice-bank-summary { gap:10px 14px;padding:12px; }
+ .practice-bank-divider { display:none; }
+ .practice-bank-stat { font-size:12px; }
+ .practice-set-actions .practice-another-set { font-size:12px; }
+}
+
+/* Practice navigation: blue actions consistent with ExamHere branding. */
+body:has(#answer-form) .nav-row #previous,
+body:has(#answer-form) .nav-row #retry {
+  background: #fff;
+  border: 1px solid #b9d1ed;
+  color: #1769c2;
+  box-shadow: none;
+}
+body:has(#answer-form) .nav-row #previous:hover:not(:disabled),
+body:has(#answer-form) .nav-row #retry:hover:not(:disabled) {
+  background: #eef6ff;
+  border-color: #1674ef;
+  color: #1159a8;
+}
+body:has(#answer-form) .nav-row #next {
+  background: #1674ef;
+  border: 1px solid #1674ef;
+  color: #fff;
+  box-shadow: none;
+}
+body:has(#answer-form) .nav-row #next:hover:not(:disabled) {
+  background: #075fc9;
+  border-color: #075fc9;
+}
+body:has(#answer-form) .nav-row button:focus-visible {
+  outline: 3px solid #93c5fd;
+  outline-offset: 2px;
+}
+
+/* Another Set: blue primary action when unlocked; muted when locked. */
+.practice-set-actions #another-set:not(:disabled) {
+  background: #1674ef;
+  border: 1px solid #1674ef;
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(22, 116, 239, .16);
+  cursor: pointer;
+  opacity: 1;
+}
+.practice-set-actions #another-set:hover:not(:disabled) {
+  background: #075fc9;
+  border-color: #075fc9;
+}
+.practice-set-actions #another-set:focus-visible {
+  outline: 3px solid #93c5fd;
+  outline-offset: 2px;
+}
+.practice-set-actions #another-set:disabled {
+  background: #f1f3f7;
+  border-color: #e6ebf1;
+  color: #9aa7b8;
+  box-shadow: none;
+  opacity: 1;
+  cursor: not-allowed;
+}
