@@ -1,3 +1,4 @@
+import { translateTexts } from "./services/translation.js";
 
 import { isAdminAuthenticated } from "./admin-auth.js";
 
@@ -700,6 +701,95 @@ async function deleteExam(id, env) {
   }
 }
 
+// POST /api/admin/exams/:id/translate-missing
+// Small, explicit batches. Existing translations are never overwritten.
+async function translateMissingExamQuestions(id, request, env) {
+  const body = await request.json().catch(() => null);
+  const language = body?.language_code;
+  if (typeof language !== "string" || language === "en") {
+    return jsonResponse({ error: "Choose a non-English target language." }, 400);
+  }
+  const requested = Number(body?.limit ?? 5);
+  if (!Number.isInteger(requested) || requested < 1 || requested > 10) {
+    return jsonResponse({ error: "Batch size must be between 1 and 10 questions." }, 400);
+  }
+  const exam = await env.DB.prepare(`
+    SELECT e.id, e.default_language, el.is_enabled
+    FROM exams e JOIN exam_languages el ON el.exam_id = e.id
+    JOIN languages l ON l.code = el.language_code AND l.is_enabled = 1
+    WHERE e.id = ? AND el.language_code = ?
+  `).bind(id, language).first();
+  if (!exam) return jsonResponse({ error: "Configure the target language for this exam first." }, 400);
+  if (Number(exam.is_enabled) === 1) {
+    return jsonResponse({ error: "Disable the public language before bulk translation." }, 409);
+  }
+  // Only missing rows, never overwrite existing text (including manual edits).
+  const candidates = await env.DB.prepare(`
+    SELECT q.id
+    FROM questions q
+    JOIN question_translations en ON en.question_id = q.id
+      AND en.language_code = 'en' AND TRIM(en.question_text) <> ''
+    WHERE q.exam_id = ? AND q.status = 'published'
+      AND (
+        NOT EXISTS (SELECT 1 FROM question_translations qt
+          WHERE qt.question_id = q.id AND qt.language_code = ?)
+        OR EXISTS (SELECT 1 FROM question_options o
+          JOIN option_translations src ON src.option_id = o.id
+            AND src.language_code = 'en' AND TRIM(src.option_text) <> ''
+          WHERE o.question_id = q.id
+            AND NOT EXISTS (SELECT 1 FROM option_translations dest
+              WHERE dest.option_id = o.id AND dest.language_code = ?))
+      )
+    ORDER BY q.id LIMIT ?
+  `).bind(id, language, language, requested).all();
+  const ids = (candidates.results || []).map(row => row.id);
+  if (!ids.length) return jsonResponse({ processed_questions: 0, translated_texts: 0, complete: true });
+  const placeholders = ids.map(() => '?').join(',');
+  const [questions, options] = await Promise.all([
+    env.DB.prepare(`SELECT q.id, src.question_text, src.explanation
+      FROM questions q JOIN question_translations src ON src.question_id = q.id AND src.language_code = 'en'
+      LEFT JOIN question_translations dest ON dest.question_id = q.id AND dest.language_code = ?
+      WHERE q.id IN (${placeholders}) AND dest.question_id IS NULL ORDER BY q.id`)
+      .bind(language, ...ids).all(),
+    env.DB.prepare(`SELECT o.id, src.option_text FROM question_options o
+      JOIN option_translations src ON src.option_id = o.id AND src.language_code = 'en'
+      LEFT JOIN option_translations dest ON dest.option_id = o.id AND dest.language_code = ?
+      WHERE o.question_id IN (${placeholders}) AND dest.option_id IS NULL ORDER BY o.id`)
+      .bind(language, ...ids).all()
+  ]);
+  const qrows = questions.results || [];
+  const orows = options.results || [];
+  const texts = [...qrows.map(row => row.question_text), ...orows.map(row => row.option_text)];
+  if (!texts.length) return jsonResponse({ error: "No translatable English source texts found." }, 409);
+  let translated;
+  try { translated = await translateTexts(texts, language, env); }
+  catch (error) {
+    console.error("Batch translation failed:", error.message);
+    return jsonResponse({ error: "Translation service failed; no changes were saved." }, 502);
+  }
+  if (translated.some(text => !text?.trim())) {
+    return jsonResponse({ error: "Translation returned empty content; no changes were saved." }, 502);
+  }
+  const statements = [
+    ...qrows.map((row, i) => env.DB.prepare(`
+      INSERT INTO question_translations
+      (question_id, language_code, question_text, explanation, question_text_source, explanation_source)
+      VALUES (?, ?, ?, '', 'machine', 'machine') ON CONFLICT(question_id, language_code) DO NOTHING
+    `).bind(row.id, language, translated[i])),
+    ...orows.map((row, i) => env.DB.prepare(`
+      INSERT INTO option_translations (option_id, language_code, option_text, translation_source)
+      VALUES (?, ?, ?, 'machine') ON CONFLICT(option_id, language_code) DO NOTHING
+    `).bind(row.id, language, translated[qrows.length + i]))
+  ];
+  try { await env.DB.batch(statements); }
+  catch (error) {
+    console.error("Batch translation database error:", error);
+    return jsonResponse({ error: "Unable to save translated texts." }, 500);
+  }
+  return jsonResponse({ processed_questions: ids.length, translated_texts: texts.length,
+    message: "Batch saved. Review translations before enabling this language." });
+}
+
 // Main router
 export async function handleAdminExams(request, env) {
   if (!(await isAdminAuthenticated(request, env))) {
@@ -719,6 +809,12 @@ export async function handleAdminExams(request, env) {
     }
 
     return jsonResponse({ error: "Method not allowed." }, 405);
+  }
+
+  const translateMatch = url.pathname.match(/^\/api\/admin\/exams\/(\d+)\/translate-missing$/);
+  if (translateMatch) {
+    if (method !== "POST") return jsonResponse({ error: "Method not allowed." }, 405);
+    return translateMissingExamQuestions(Number(translateMatch[1]), request, env);
   }
 
   const match = url.pathname.match(

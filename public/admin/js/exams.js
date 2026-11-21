@@ -237,6 +237,7 @@ function renderSupportedLanguages(exam = null) {
       <label style="margin-left:16px"><input type="checkbox" data-enabled-language="${escapeHTML(code)}" ${enabled ? 'checked' : ''} ${!selected ? 'disabled' : ''}>
         Enabled (public)</label>
       <small style="display:block">${escapeHTML(counts)} — ${ready ? 'Ready' : 'Preparing / incomplete'}</small>
+      ${exam && selected && !enabled && code !== 'en' ? `<button type="button" data-translate-language="${escapeHTML(code)}" data-exam-id="${Number(exam.id)}" style="margin-top:6px">Translate missing (5 questions)</button>` : ''}
     </div>`;
   }).join('');
 }
@@ -433,3 +434,27 @@ tableBody.addEventListener("click", (event) => {
 
 // Initial load
 loadExams();
+// Explicit admin action: one small batch per click; no automatic loops or retries.
+document.getElementById('exam-supported-languages').addEventListener('click', async event => {
+  const button = event.target.closest('[data-translate-language]');
+  if (!button) return;
+  const examId = Number(button.dataset.examId);
+  const languageCode = button.dataset.translateLanguage;
+  if (!Number.isInteger(examId) || !languageCode) return;
+  button.disabled = true;
+  showFormMessage(`Translating up to 5 questions into ${languageCode}...`);
+  try {
+    const result = await apiRequest(`${API_URL}/${examId}/translate-missing`, {
+      method: 'POST', body: JSON.stringify({ language_code: languageCode, limit: 5 })
+    });
+    showFormMessage(`Translated ${result.translated_texts} texts across ${result.processed_questions} questions. Review before enabling.`, 'success');
+    // Refresh coverage, but keep the edit dialog and unsaved form fields in place.
+    const latest = await apiRequest(API_URL);
+    exams = latest.exams || [];
+    const updated = exams.find(exam => Number(exam.id) === examId);
+    if (updated) renderSupportedLanguages(updated);
+  } catch (error) {
+    showFormMessage(error.message, 'error');
+    button.disabled = false;
+  }
+});
