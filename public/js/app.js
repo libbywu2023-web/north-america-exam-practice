@@ -5,6 +5,8 @@ import {
 } from "./common.js";
 
 const lang = getLanguage();
+// Visiting a localized homepage explicitly establishes the site preference.
+localStorage.setItem("exam-language", lang);
 
 setLanguageSelect(lang);
 document.documentElement.lang = lang;
@@ -213,13 +215,13 @@ function createExamLink(exam) {
 
   const slug = encodeURIComponent(exam.slug);
 
-  if (lang === "zh-CN") {
-    link.href = `/zh/${slug}`;
-  } else if (lang === "zh-TW") {
-    link.href = `/zh-tw/${slug}`;
-  } else {
-    link.href = `/${slug}`;
-  }
+  const supported = String(exam.supported_languages || '').split(',');
+  const effective = supported.includes(lang) ? lang :
+    supported.includes(exam.default_language) ? exam.default_language :
+    supported.includes('en') ? 'en' : supported[0];
+  if (effective === 'zh-CN') link.href = `/zh/${slug}`;
+  else if (effective === 'zh-TW') link.href = `/zh-tw/${slug}`;
+  else link.href = `/${slug}`;
 
   // NEW is controlled manually in the exam admin settings.
   if (Number(exam.show_new_badge) === 1) {

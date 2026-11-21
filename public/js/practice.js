@@ -1,4 +1,4 @@
-import { api, copy, getLanguage, setLanguageSelect } from "./common.js";
+import { api, copy, getLanguage, setLanguageSelect, setHomeLinks } from "./common.js";
 
 const lang = getLanguage();
 const t = copy[lang];
@@ -98,6 +98,7 @@ function updateSeo(examInfo) {
 }
 
 setLanguageSelect(lang);
+setHomeLinks();
 document.documentElement.lang = lang;
 
 document.querySelector("#choose-label").textContent = t.choose;
@@ -258,6 +259,15 @@ async function loadSet({ newSet = false } = {}) {
 }
 
 try {
+  // Load exam policy before requesting questions. The server also enforces it.
+  const examMetadata = await api(`/api/exams/${encodeURIComponent(exam)}?lang=${encodeURIComponent(lang)}`);
+  const allowedLanguages = examMetadata.supported_languages || [];
+  const languageSelect = document.querySelector('#language');
+  if (languageSelect) {
+    for (const option of [...languageSelect.options]) {
+      if (!allowedLanguages.includes(option.value)) option.remove();
+    }
+  }
   questions = await loadSet();
   if (!questions.length) throw new Error(t.noQuestions);
   if (!topic && !practiceState.questionIds.length) {
@@ -267,9 +277,7 @@ try {
   savePracticeState();
 
   // SEO is non-critical: never hold up the first question waiting for it.
-  api(`/api/exams/${encodeURIComponent(exam)}?lang=${encodeURIComponent(lang)}`)
-    .then(data => { if (data.exam) updateSeo(data.exam); })
-    .catch(error => console.warn("Exam SEO metadata unavailable:", error));
+  if (examMetadata.exam) updateSeo(examMetadata.exam);
 
   // Restore submitted answers using the current language.
   await Promise.allSettled(

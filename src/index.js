@@ -29,6 +29,30 @@ function languageOrDefault(value) {
   return ["en", "zh-CN", "zh-TW"].includes(value) ? value : "en";
 }
 
+// A missing association or a Preparing language must never be served publicly.
+async function examLanguagePolicy(db, slug) {
+  const exam = await db.prepare(`
+    SELECT id, default_language FROM exams
+    WHERE slug = ? AND status = 'published'
+  `).bind(slug).first();
+  if (!exam) return null;
+  const result = await db.prepare(`
+    SELECT el.language_code FROM exam_languages el
+    JOIN languages l ON l.code = el.language_code
+    WHERE el.exam_id = ? AND el.is_enabled = 1 AND l.is_enabled = 1
+    ORDER BY l.sort_order, l.code
+  `).bind(exam.id).all();
+  const supported = (result.results || []).map(row => row.language_code);
+  const fallback = supported.includes(exam.default_language)
+    ? exam.default_language : supported.includes('en') ? 'en' : supported[0];
+  return { ...exam, supported, fallback };
+}
+
+function languagePath(lang, slug) {
+  const prefix = lang === 'zh-CN' ? '/zh' : lang === 'zh-TW' ? '/zh-tw' : '';
+  return `${prefix}/${slug}`;
+}
+
 function shuffle(items) {
   const result = [...items];
   for (let i = result.length - 1; i > 0; i--) {
@@ -90,7 +114,11 @@ async function listCatalogExams(db, lang) {
       e.question_count,
       e.time_limit_minutes,
       e.passing_score_percent,
-      e.show_new_badge
+      e.show_new_badge,
+      (SELECT GROUP_CONCAT(el.language_code, ',') FROM exam_languages el
+       JOIN languages l ON l.code = el.language_code
+       WHERE el.exam_id = e.id AND el.is_enabled = 1 AND l.is_enabled = 1) AS supported_languages,
+      e.default_language
 
     FROM exams e
 
@@ -124,6 +152,7 @@ async function listCatalogExams(db, lang) {
       AND et_en.language_code = 'en'
 
     WHERE e.status = 'published'
+      AND EXISTS (SELECT 1 FROM exam_languages el WHERE el.exam_id=e.id AND el.is_enabled=1)
       AND COALESCE(et.title, et_en.title) IS NOT NULL
 
     ORDER BY
@@ -303,6 +332,9 @@ async function api(request, env) {
 
   const examMatch = path.match(/^\/api\/exams\/([a-z0-9-]+)$/);
   if (request.method === "GET" && examMatch) {
+    const policy = await examLanguagePolicy(env.DB, examMatch[1]);
+    if (!policy) return json({ error: 'Exam not found' }, 404);
+    if (!policy.supported.includes(lang)) return json({ error: 'Language not available for this exam', fallback_language: policy.fallback }, 409);
     const exam = await getPublishedExam(env.DB)
       .bind(lang, lang, lang, examMatch[1])
       .first();
@@ -334,11 +366,14 @@ async function api(request, env) {
   ORDER BY t.sort_order
 `).bind(lang, lang, exam.id).all();
 
-    return json({ exam, topics: topics.results || [] });
+    return json({ exam, topics: topics.results || [], supported_languages: policy.supported, default_language: policy.fallback });
   }
 
   const questionsMatch = path.match(/^\/api\/exams\/([a-z0-9-]+)\/questions$/);
   if (request.method === "GET" && questionsMatch) {
+    const policy = await examLanguagePolicy(env.DB, questionsMatch[1]);
+    if (!policy) return json({ error: 'Exam not found' }, 404);
+    if (!policy.supported.includes(lang)) return json({ error: 'Language not available for this exam', fallback_language: policy.fallback }, 409);
     const exam = await env.DB.prepare(
       "SELECT id, question_count FROM exams WHERE slug = ? AND status = 'published'"
     ).bind(questionsMatch[1]).first();
@@ -429,6 +464,13 @@ async function api(request, env) {
       WHERE q.id = ? AND q.status = 'published'
     `).bind(body.option_id, lang, questionId).first();
     if (!row) return json({ error: "Question or option not found." }, 404);
+    const policy = await env.DB.prepare(`
+      SELECT e.slug FROM questions q JOIN exams e ON e.id = q.exam_id
+      WHERE q.id = ? AND e.status = 'published'
+    `).bind(questionId).first();
+    if (!policy || !(await examLanguagePolicy(env.DB, policy.slug))?.supported.includes(lang)) {
+      return json({ error: 'Language not available for this exam' }, 409);
+    }
     return json({
       correct: row.is_correct === 1,
       correct_option_id: row.correct_option_id,
@@ -452,6 +494,8 @@ async function api(request, env) {
     ).bind(slug).first();
 
     if (!exam) return json({ error: "Exam not found." }, 404);
+    const policy = await examLanguagePolicy(env.DB, slug);
+    if (!policy.supported.includes(lang)) return json({ error: 'Language not available for this exam', fallback_language: policy.fallback }, 409);
 
     // Randomly select questions.
     const selected = await env.DB.prepare(`
@@ -728,6 +772,14 @@ export default {
         }
 
         if (examSlug) {
+          const policy = await examLanguagePolicy(env.DB, examSlug);
+          if (policy && !policy.supported.includes(routeLang)) {
+            if (!policy.fallback) return json({ error: 'No public languages available' }, 404);
+            const target = new URL(request.url);
+            target.pathname = languagePath(policy.fallback, examSlug);
+            target.searchParams.delete('lang');
+            return Response.redirect(target.toString(), 302);
+          }
           const exam = await getPublishedExam(env.DB)
             .bind(routeLang, routeLang, routeLang, examSlug)
             .first();

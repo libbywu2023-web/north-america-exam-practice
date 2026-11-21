@@ -61,6 +61,21 @@ export function getLanguage() {
 
   return ["en", "zh-CN", "zh-TW"].includes(saved) ? saved : "en";
 }
+// The homepage preference is independent of the language used by an exam.
+export function getHomePath() {
+  const preferred = localStorage.getItem("exam-language");
+  if (preferred === "zh-CN") return "/zh";
+  if (preferred === "zh-TW") return "/zh-tw";
+  return "/";
+}
+
+export function setHomeLinks() {
+  const homePath = getHomePath();
+  for (const link of document.querySelectorAll("#back-link, .site-header .brand, .footer-logo")) {
+    link.href = homePath;
+  }
+}
+
 export function clientId() {
   let id = localStorage.getItem("exam-client-id");
   if (!id) {
@@ -88,10 +103,21 @@ export function setLanguageSelect(lang) {
 
   select.value = lang;
 
+  // Browsers can restore a cached page while retaining the select's newer
+  // form value. On history navigation, the URL is the source of truth.
+  window.addEventListener("pageshow", () => {
+    select.value = getLanguage();
+    setHomeLinks();
+  });
+
   select.addEventListener("change", () => {
     const newLang = select.value;
 
-    localStorage.setItem("exam-language", newLang);
+    // Only homepage language changes update the persistent site preference.
+    const homePathname = location.pathname.toLowerCase();
+    if (["/", "/zh", "/zh-tw"].includes(homePathname)) {
+      localStorage.setItem("exam-language", newLang);
+    }
 
     const pathname = location.pathname.toLowerCase();
     const params = new URLSearchParams(location.search);

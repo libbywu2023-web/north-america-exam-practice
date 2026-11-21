@@ -1,6 +1,7 @@
-import { api, copy, getLanguage, setLanguageSelect } from "./common.js";
+import { api, copy, getLanguage, setLanguageSelect, setHomeLinks } from "./common.js";
 const lang = getLanguage(), t = copy[lang];
 setLanguageSelect(lang);
+setHomeLinks();
 document.documentElement.lang = lang;
 document.querySelector("#mock-heading").textContent = t.mock;
 document.querySelector("#submit-mock").textContent = t.submit;
