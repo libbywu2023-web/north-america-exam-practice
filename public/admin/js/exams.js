@@ -239,6 +239,7 @@ function renderSupportedLanguages(exam = null) {
       <small style="display:block">${escapeHTML(counts)} — ${ready ? 'Ready' : 'Preparing / incomplete'}</small>
       ${exam && selected && !enabled && code !== 'en' ? `<button type="button" data-translate-language="${escapeHTML(code)}" data-exam-id="${Number(exam.id)}" style="margin-top:6px">Translate missing (5 questions)</button>` : ''}
       ${exam && selected && !enabled && code !== 'en' ? `<button type="button" data-translate-metadata="${escapeHTML(code)}" data-exam-id="${Number(exam.id)}" style="margin-top:6px;margin-left:8px">Translate missing title / topics</button>` : ''}
+      ${exam && selected && !enabled && code !== 'en' ? `<button type="button" data-review-language="${escapeHTML(code)}" data-exam-id="${Number(exam.id)}" style="margin-top:6px;margin-left:8px">Review translations</button>` : ''}
     </div>`;
   }).join('');
 }
@@ -486,4 +487,61 @@ document.getElementById('exam-supported-languages').addEventListener('click', as
     showFormMessage(error.message, 'error');
     button.disabled = false;
   }
+});
+
+// Review queue is rendered in the edit modal, without navigating away from unsaved form fields.
+let reviewPage = 1;
+let reviewContext = null;
+async function loadReviewQueue() {
+  if (!reviewContext) return;
+  const {examId, languageCode} = reviewContext;
+  const panel = document.getElementById('exam-review-panel');
+  panel.textContent = 'Loading review items...';
+  try {
+    const data = await apiRequest(`${API_URL}/${examId}/review-queue?language_code=${encodeURIComponent(languageCode)}&page=${reviewPage}`);
+    const summary = data.summary || {};
+    const totals = Object.values(summary).reduce((a,v)=>({total:a.total+Number(v.total||0),reviewed:a.reviewed+Number(v.reviewed||0)}),{total:0,reviewed:0});
+    panel.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><strong>Review ${escapeHTML(languageCode)} — ${totals.reviewed}/${totals.total} approved</strong><button type="button" data-review-close>Close</button></div>
+      <p style="font-size:13px">Review each English source against the translation. Any later edit invalidates approval. Only translations that exist are listed; complete missing translations first.</p>
+      <div id="exam-review-items"></div>
+      <div style="display:flex;gap:12px;align-items:center"><button type="button" data-review-prev ${reviewPage===1?'disabled':''}>Previous</button><span>Page ${reviewPage} / ${Math.max(1,Math.ceil(data.total/data.limit))}</span><button type="button" data-review-next ${reviewPage*data.limit>=data.total?'disabled':''}>Next</button></div>`;
+    const list=panel.querySelector('#exam-review-items');
+    for (const item of data.items) {
+      const div=document.createElement('div');
+      div.style.cssText='border-top:1px solid #ddd;padding:12px 0';
+      div.innerHTML=`<div><strong>${escapeHTML(item.entity_type)} #${Number(item.entity_id)}</strong> — ${item.reviewed?'Approved':'Pending'}</div>
+        <div style="font-size:13px;margin:6px 0;white-space:pre-wrap"><strong>English:</strong> ${escapeHTML(item.source_text)}</div>
+        <div style="font-size:13px;margin:6px 0;white-space:pre-wrap"><strong>${escapeHTML(languageCode)}:</strong> ${escapeHTML(item.translated_text)}</div>
+        <button type="button" data-approve-review ${item.reviewed||data.public_enabled?'disabled':''}>${item.reviewed?'Approved':'Approve translation'}</button>`;
+      const button=div.querySelector('[data-approve-review]');
+      button.addEventListener('click',async()=>{
+        button.disabled=true;
+        try {
+          await apiRequest(`${API_URL}/${examId}/review-item`,{method:'POST',body:JSON.stringify({language_code:languageCode,entity_type:item.entity_type,entity_id:Number(item.entity_id),reviewed_text:item.translated_text})});
+          await loadReviewQueue();
+        } catch(error) {showFormMessage(error.message,'error');button.disabled=false;}
+      });
+      list.appendChild(div);
+    }
+  } catch(error) {panel.textContent=error.message;}
+}
+document.getElementById('exam-supported-languages').addEventListener('click',event=>{
+  const button=event.target.closest('[data-review-language]');
+  if (!button) return;
+  reviewContext={examId:Number(button.dataset.examId),languageCode:button.dataset.reviewLanguage};
+  reviewPage=1;
+  let panel=document.getElementById('exam-review-panel');
+  if (!panel) {
+    panel=document.createElement('section');
+    panel.id='exam-review-panel';
+    panel.style.cssText='padding:16px;margin-top:12px;border:1px solid #bbb;border-radius:8px;max-height:55vh;overflow:auto';
+    document.getElementById('exam-supported-languages').after(panel);
+  }
+  panel.hidden=false;
+  loadReviewQueue();
+});
+document.addEventListener('click',event=>{
+  if(event.target.closest('[data-review-close]')) {document.getElementById('exam-review-panel').hidden=true;reviewContext=null;}
+  if(event.target.closest('[data-review-prev]')&&reviewPage>1) {reviewPage--;loadReviewQueue();}
+  if(event.target.closest('[data-review-next]')) {reviewPage++;loadReviewQueue();}
 });

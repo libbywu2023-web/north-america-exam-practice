@@ -90,6 +90,116 @@ function isTranslationReady(coverage, titleOverride = null) {
     Number(coverage.topic_ready) === Number(coverage.topic_total);
 }
 
+// Review records bind approval to the exact text, not merely to a row ID.
+// A later edit automatically invalidates the approval when coverage is checked.
+const REVIEW_TYPES = {
+  title: { table: 'exam_translations', id: 'exam_id', text: 'title' },
+  topic: { table: 'topic_translations', id: 'topic_id', text: 'name' },
+  question: { table: 'question_translations', id: 'question_id', text: 'question_text' },
+  option: { table: 'option_translations', id: 'option_id', text: 'option_text' }
+};
+
+async function reviewStatus(env, examId, language) {
+  const result = await env.DB.prepare(`
+    SELECT kind, COUNT(*) AS total, SUM(approved) AS reviewed FROM (
+      SELECT 'title' AS kind, CASE WHEN r.reviewed_text = et.title THEN 1 ELSE 0 END AS approved
+      FROM exam_translations et LEFT JOIN translation_reviews r
+        ON r.exam_id = et.exam_id AND r.language_code = et.language_code
+        AND r.entity_type = 'title' AND r.entity_id = et.exam_id
+      WHERE et.exam_id = ? AND et.language_code = ? AND TRIM(et.title) <> ''
+      UNION ALL
+      SELECT 'topic', CASE WHEN r.reviewed_text = tt.name THEN 1 ELSE 0 END
+      FROM topics t JOIN questions q ON q.topic_id = t.id AND q.status = 'published'
+      JOIN topic_translations tt ON tt.topic_id = t.id AND tt.language_code = ?
+      LEFT JOIN translation_reviews r ON r.exam_id = t.exam_id AND r.language_code = tt.language_code
+        AND r.entity_type = 'topic' AND r.entity_id = t.id
+      WHERE t.exam_id = ? AND TRIM(tt.name) <> ''
+      GROUP BY t.id
+      UNION ALL
+      SELECT 'question', CASE WHEN r.reviewed_text = qt.question_text THEN 1 ELSE 0 END
+      FROM questions q JOIN question_translations qt ON qt.question_id = q.id AND qt.language_code = ?
+      LEFT JOIN translation_reviews r ON r.exam_id = q.exam_id AND r.language_code = qt.language_code
+        AND r.entity_type = 'question' AND r.entity_id = q.id
+      WHERE q.exam_id = ? AND q.status = 'published' AND TRIM(qt.question_text) <> ''
+      UNION ALL
+      SELECT 'option', CASE WHEN r.reviewed_text = ot.option_text THEN 1 ELSE 0 END
+      FROM question_options o JOIN questions q ON q.id = o.question_id
+      JOIN option_translations ot ON ot.option_id = o.id AND ot.language_code = ?
+      LEFT JOIN translation_reviews r ON r.exam_id = q.exam_id AND r.language_code = ot.language_code
+        AND r.entity_type = 'option' AND r.entity_id = o.id
+      WHERE q.exam_id = ? AND q.status = 'published' AND TRIM(ot.option_text) <> ''
+    ) GROUP BY kind
+  `).bind(examId,language,language,examId,language,examId,language,examId).all();
+  const summary = { title: {total:0,reviewed:0}, topic: {total:0,reviewed:0}, question: {total:0,reviewed:0}, option: {total:0,reviewed:0} };
+  for (const row of result.results || []) summary[row.kind] = {total:Number(row.total), reviewed:Number(row.reviewed || 0)};
+  return summary;
+}
+
+// Paginated review queue: source English and target translation shown side by side.
+async function handleReviewQueue(id, language, page, env) {
+  const configured = await env.DB.prepare(`SELECT el.is_enabled, l.review_required FROM exam_languages el JOIN languages l ON l.code=el.language_code WHERE el.exam_id=? AND el.language_code=?`).bind(id,language).first();
+  if (!configured) return jsonResponse({error:'Exam language not configured.'},404);
+  const limit=20, offset=(page-1)*limit;
+  const query=`
+    SELECT 'title' AS entity_type, e.id AS entity_id, en.title AS source_text, tr.title AS translated_text
+    FROM exams e JOIN exam_translations en ON en.exam_id=e.id AND en.language_code='en'
+    JOIN exam_translations tr ON tr.exam_id=e.id AND tr.language_code=? WHERE e.id=? AND TRIM(tr.title)<>''
+    UNION ALL
+    SELECT 'topic', t.id, en.name, tr.name FROM topics t
+    JOIN topic_translations en ON en.topic_id=t.id AND en.language_code='en'
+    JOIN topic_translations tr ON tr.topic_id=t.id AND tr.language_code=?
+    WHERE t.exam_id=? AND TRIM(tr.name)<>'' AND EXISTS(SELECT 1 FROM questions q WHERE q.topic_id=t.id AND q.status='published')
+    UNION ALL
+    SELECT 'question', q.id, en.question_text, tr.question_text FROM questions q
+    JOIN question_translations en ON en.question_id=q.id AND en.language_code='en'
+    JOIN question_translations tr ON tr.question_id=q.id AND tr.language_code=?
+    WHERE q.exam_id=? AND q.status='published' AND TRIM(tr.question_text)<>''
+    UNION ALL
+    SELECT 'option', o.id, en.option_text, tr.option_text FROM question_options o
+    JOIN questions q ON q.id=o.question_id
+    JOIN option_translations en ON en.option_id=o.id AND en.language_code='en'
+    JOIN option_translations tr ON tr.option_id=o.id AND tr.language_code=?
+    WHERE q.exam_id=? AND q.status='published' AND TRIM(tr.option_text)<>''`;
+  const args=[language,id,language,id,language,id,language,id];
+  const count=await env.DB.prepare(`SELECT COUNT(*) AS n FROM (${query})`).bind(...args).first();
+  const rows=await env.DB.prepare(`SELECT x.*, CASE WHEN r.reviewed_text=x.translated_text THEN 1 ELSE 0 END AS reviewed FROM (${query}) x LEFT JOIN translation_reviews r ON r.exam_id=? AND r.language_code=? AND r.entity_type=x.entity_type AND r.entity_id=x.entity_id ORDER BY CASE x.entity_type WHEN 'title' THEN 0 WHEN 'topic' THEN 1 WHEN 'question' THEN 2 ELSE 3 END, x.entity_id LIMIT ? OFFSET ?`).bind(...args,id,language,limit,offset).all();
+  return jsonResponse({items:rows.results||[],total:Number(count?.n||0),page,limit,summary:await reviewStatus(env,id,language),public_enabled:Number(configured.is_enabled)===1});
+}
+
+async function handleReviewItem(id, request, env) {
+  const body = await request.json().catch(() => null);
+  const { language_code: language, entity_type: type, entity_id: entityId } = body || {};
+  if (typeof language !== 'string' || !REVIEW_TYPES[type] || !Number.isSafeInteger(entityId) || entityId <= 0) {
+    return jsonResponse({error:'Invalid review item.'},400);
+  }
+  const config = await env.DB.prepare(`
+    SELECT el.is_enabled, l.review_required FROM exam_languages el
+    JOIN languages l ON l.code = el.language_code AND l.is_enabled = 1
+    WHERE el.exam_id = ? AND el.language_code = ?
+  `).bind(id,language).first();
+  if (!config || Number(config.is_enabled) === 1) return jsonResponse({error:'Review requires a configured, non-public language.'},409);
+  const cfg = REVIEW_TYPES[type];
+  let row;
+  if (type === 'title') {
+    if (entityId !== id) return jsonResponse({error:'Wrong title ID.'},400);
+    row = await env.DB.prepare(`SELECT title AS content FROM exam_translations WHERE exam_id = ? AND language_code = ?`).bind(id,language).first();
+  } else if (type === 'topic') {
+    row = await env.DB.prepare(`SELECT tt.name AS content FROM topic_translations tt JOIN topics t ON t.id = tt.topic_id WHERE t.exam_id = ? AND tt.language_code = ? AND t.id = ? AND EXISTS (SELECT 1 FROM questions q WHERE q.topic_id = t.id AND q.status = 'published')`).bind(id,language,entityId).first();
+  } else if (type === 'question') {
+    row = await env.DB.prepare(`SELECT qt.question_text AS content FROM question_translations qt JOIN questions q ON q.id = qt.question_id WHERE q.exam_id = ? AND q.status = 'published' AND qt.language_code = ? AND q.id = ?`).bind(id,language,entityId).first();
+  } else {
+    row = await env.DB.prepare(`SELECT ot.option_text AS content FROM option_translations ot JOIN question_options o ON o.id = ot.option_id JOIN questions q ON q.id = o.question_id WHERE q.exam_id = ? AND q.status = 'published' AND ot.language_code = ? AND o.id = ?`).bind(id,language,entityId).first();
+  }
+  if (!row || !row.content?.trim()) return jsonResponse({error:'Translation not found or empty.'},404);
+  // Require the client to confirm the exact text it displayed to the reviewer.
+  if (body.reviewed_text !== row.content) return jsonResponse({error:'Translation changed. Reload before approving.'},409);
+  await env.DB.prepare(`INSERT INTO translation_reviews (exam_id,language_code,entity_type,entity_id,reviewed_text)
+    VALUES (?,?,?,?,?) ON CONFLICT(exam_id,language_code,entity_type,entity_id)
+    DO UPDATE SET reviewed_text = excluded.reviewed_text, reviewed_at = CURRENT_TIMESTAMP`)
+    .bind(id,language,type,entityId,row.content).run();
+  return jsonResponse({success:true});
+}
+
 function validateSlug(slug) {
   return typeof slug === "string" &&
     /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug);
@@ -546,6 +656,19 @@ async function updateExam(id, request, env) {
     }
   }
 
+  // New review-required languages must be complete and explicitly approved.
+  // Already-public languages retain their existing status without retroactive review.
+  for (const row of languageSelection.rows) {
+    if (!row.is_enabled || previous.get(row.language_code) === 1) continue;
+    const policy = await env.DB.prepare(`SELECT review_required FROM languages WHERE code = ?`)
+      .bind(row.language_code).first();
+    if (Number(policy?.review_required) !== 1) continue;
+    const stats = await reviewStatus(env, id, row.language_code);
+    if (Object.values(stats).some(item => item.total !== item.reviewed) || stats.title.total !== 1) {
+      return jsonResponse({error:`Cannot enable ${row.language_code}: translations must be individually reviewed after the latest edits.`},400);
+    }
+  }
+
   const statements = [
     env.DB.prepare(`
       UPDATE exams
@@ -875,6 +998,29 @@ export async function handleAdminExams(request, env) {
     }
 
     return jsonResponse({ error: "Method not allowed." }, 405);
+  }
+
+  const queueMatch = url.pathname.match(/^\/api\/admin\/exams\/(\d+)\/review-queue$/);
+  if (queueMatch) {
+    if (method !== 'GET') return jsonResponse({error:'Method not allowed.'},405);
+    const page=Number(url.searchParams.get('page')||1);
+    const language=url.searchParams.get('language_code');
+    if (!language || !Number.isSafeInteger(page) || page<1 || page>100000) return jsonResponse({error:'Invalid request.'},400);
+    return handleReviewQueue(Number(queueMatch[1]),language,page,env);
+  }
+  const reviewMatch = url.pathname.match(/^\/api\/admin\/exams\/(\d+)\/review-item$/);
+  if (reviewMatch) {
+    if (method !== 'POST') return jsonResponse({error:'Method not allowed.'},405);
+    return handleReviewItem(Number(reviewMatch[1]),request,env);
+  }
+  const statusMatch = url.pathname.match(/^\/api\/admin\/exams\/(\d+)\/review-status$/);
+  if (statusMatch) {
+    if (method !== 'GET') return jsonResponse({error:'Method not allowed.'},405);
+    const id = Number(statusMatch[1]);
+    const language = url.searchParams.get('language_code');
+    const configured = await env.DB.prepare(`SELECT 1 FROM exam_languages WHERE exam_id = ? AND language_code = ?`).bind(id,language).first();
+    if (!configured) return jsonResponse({error:'Exam language not configured.'},404);
+    return jsonResponse({summary:await reviewStatus(env,id,language)});
   }
 
   const metadataMatch = url.pathname.match(/^\/api\/admin\/exams\/(\d+)\/translate-metadata$/);
