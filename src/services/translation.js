@@ -7,6 +7,7 @@ const API_VERSION = "3.0";
 const AZURE_LANGUAGE_CODES = {
   "zh-CN": "zh-Hans",
   "zh-TW": "zh-Hant",
+  fr: "fr-ca",
 };
 
 function getAzureLanguageCode(languageCode) {

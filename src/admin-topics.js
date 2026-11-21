@@ -30,32 +30,26 @@ function validateSlug(slug) {
 }
 
 function validateTranslations(translations, languages) {
-  if (
-    !translations ||
-    typeof translations !== "object" ||
-    Array.isArray(translations)
-  ) {
-    return false;
-  }
-
-  return languages.every(language => {
-    const value = translations[language.code];
-
-    return typeof value === "string" &&
-      value.trim().length > 0 &&
-      value.trim().length <= 150;
-  });
+  if (!translations || typeof translations !== "object" || Array.isArray(translations)) return false;
+  const allowed = new Set(languages.map(language => language.code));
+  if (!Object.keys(translations).every(code => allowed.has(code))) return false;
+  if (typeof translations.en !== "string" || !translations.en.trim()) return false;
+  return Object.values(translations).every(value =>
+    typeof value === "string" && value.length <= 150
+  );
 }
 
 function cleanTranslations(translations, languages) {
   const result = {};
-
   for (const language of languages) {
-    result[language.code] = translations[language.code].trim();
+    const value = translations[language.code];
+    if (typeof value === "string" && value.trim()) {
+      result[language.code] = value.trim();
+    }
   }
-
   return result;
 }
+
 
 function validateTopicFields(body) {
   const examId = Number(body.exam_id);
@@ -225,7 +219,7 @@ async function createTopic(request, env) {
 
   if (!validateTranslations(body.translations, languages)) {
     return jsonResponse({
-      error: "Please provide a name for every enabled language. Names must be 150 characters or fewer."
+      error: "Please provide an English name; optional translations must be 150 characters or fewer."
     }, 400);
   }
 
@@ -255,7 +249,7 @@ async function createTopic(request, env) {
       fields.randomQuestionCount
     ),
 
-    ...languages.map(language =>
+    ...Object.keys(translations).map(code =>
       env.DB.prepare(`
         INSERT INTO topic_translations
           (topic_id, language_code, name)
@@ -263,8 +257,8 @@ async function createTopic(request, env) {
         FROM topics
         WHERE exam_id = ? AND slug = ?
       `).bind(
-        language.code,
-        translations[language.code],
+        code,
+        translations[code],
         fields.examId,
         fields.slug
       )
@@ -327,7 +321,7 @@ async function updateTopic(id, request, env) {
 
   if (!validateTranslations(body.translations, languages)) {
     return jsonResponse({
-      error: "Please provide a name for every enabled language. Names must be 150 characters or fewer."
+      error: "Please provide an English name; optional translations must be 150 characters or fewer."
     }, 400);
   }
 
@@ -388,14 +382,14 @@ async function updateTopic(id, request, env) {
       id
     ),
 
-    ...languages.map(language =>
+    ...Object.keys(translations).map(code =>
       env.DB.prepare(`
         INSERT INTO topic_translations
           (topic_id, language_code, name)
         VALUES (?, ?, ?)
         ON CONFLICT(topic_id, language_code)
         DO UPDATE SET name = excluded.name
-      `).bind(id, language.code, translations[language.code])
+      `).bind(id, code, translations[code])
     ),
 
     env.DB.prepare(`

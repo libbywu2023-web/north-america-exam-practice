@@ -201,7 +201,7 @@ function renderTranslationFields(translations = {}) {
           type="text"
           maxlength="200"
           value="${escapeHTML(existing.title || "")}"
-          required
+          ${language.code === "en" ? "required" : ""}
         >
 
         <label for="translation-description-${code}">Description</label>
@@ -213,6 +213,35 @@ function renderTranslationFields(translations = {}) {
       </section>
     `;
   }).join("");
+}
+
+function renderSupportedLanguages(exam = null) {
+  const container = document.getElementById('exam-supported-languages');
+  const configured = exam?.supported_languages || {};
+  const coverage = exam?.language_coverage || {};
+  const defaultCode = document.getElementById('exam-default-language').value;
+  container.innerHTML = languages.map(language => {
+    const code = language.code;
+    const existing = configured[code];
+    const selected = exam ? Boolean(existing) : code === defaultCode;
+    const enabled = Boolean(existing?.is_enabled);
+    const stats = coverage[code];
+    const counts = stats ? `Questions ${stats.question_ready}/${stats.question_total}, options ${stats.option_ready}/${stats.option_total}, topics ${stats.topic_ready}/${stats.topic_total}, title ${stats.title_ready ? 'yes' : 'no'}` : 'No existing coverage';
+    const ready = stats && Number(stats.title_ready) === 1 && Number(stats.question_total) > 0 &&
+      Number(stats.question_ready) === Number(stats.question_total) &&
+      Number(stats.option_ready) === Number(stats.option_total) &&
+      Number(stats.topic_ready) === Number(stats.topic_total);
+    return `<div class="exam-language-section" style="margin-bottom:10px">
+      <label><input type="checkbox" data-supported-language="${escapeHTML(code)}" ${selected ? 'checked' : ''}>
+        ${escapeHTML(language.native_name || language.name)} (${escapeHTML(code)})</label>
+      <label style="margin-left:16px"><input type="checkbox" data-enabled-language="${escapeHTML(code)}" ${enabled ? 'checked' : ''} ${!selected ? 'disabled' : ''}>
+        Enabled (public)</label>
+      <small style="display:block">${escapeHTML(counts)} — ${ready ? 'Ready' : 'Preparing / incomplete'}</small>
+      ${exam && selected && !enabled && code !== 'en' ? `<button type="button" data-translate-language="${escapeHTML(code)}" data-exam-id="${Number(exam.id)}" style="margin-top:6px">Translate missing (5 questions)</button>` : ''}
+      ${exam && selected && !enabled && code !== 'en' ? `<button type="button" data-translate-metadata="${escapeHTML(code)}" data-exam-id="${Number(exam.id)}" style="margin-top:6px;margin-left:8px">Translate missing title / topics</button>` : ''}
+      ${exam && selected && !enabled && code !== 'en' ? `<button type="button" data-review-language="${escapeHTML(code)}" data-exam-id="${Number(exam.id)}" style="margin-top:6px;margin-left:8px">Review translations</button>` : ''}
+    </div>`;
+  }).join('');
 }
 
 function openModal(exam = null) {
@@ -258,6 +287,7 @@ function openModal(exam = null) {
   );
 
   renderTranslationFields(exam?.translations || {});
+  renderSupportedLanguages(exam);
 
   document.getElementById("exam-modal-title").textContent =
     exam ? "Edit Exam" : "Add Exam";
@@ -298,7 +328,13 @@ async function saveExam(event) {
     question_count: Number(document.getElementById("exam-question-count").value),
     time_limit_minutes: timeValue === "" ? null : Number(timeValue),
     passing_score_percent: Number(document.getElementById("exam-passing-score").value),
-    translations
+    translations,
+    supported_languages: languages.filter(language =>
+      document.querySelector(`[data-supported-language="${language.code}"]`)?.checked
+    ).map(language => ({
+      language_code: language.code,
+      is_enabled: Boolean(document.querySelector(`[data-enabled-language="${language.code}"]`)?.checked)
+    }))
   };
 
   const saveButton = document.getElementById("save-exam-button");
@@ -368,6 +404,17 @@ document.getElementById("refresh-exams-button")
 document.getElementById("exam-country")
   .addEventListener("change", () => updateRegionOptions());
 
+document.getElementById('exam-supported-languages').addEventListener('change', event => {
+  if (!event.target.matches('[data-supported-language]')) return;
+  const code = event.target.dataset.supportedLanguage;
+  const enabled = document.querySelector(`[data-enabled-language="${code}"]`);
+  enabled.disabled = !event.target.checked;
+  if (!event.target.checked) enabled.checked = false;
+});
+document.getElementById('exam-default-language').addEventListener('change', event => {
+  const supported = document.querySelector(`[data-supported-language="${event.target.value}"]`);
+  if (supported) { supported.checked = true; supported.dispatchEvent(new Event('change', { bubbles: true })); }
+});
 searchInput.addEventListener("input", renderExams);
 form.addEventListener("submit", saveExam);
 
@@ -389,3 +436,129 @@ tableBody.addEventListener("click", (event) => {
 
 // Initial load
 loadExams();
+// Explicit admin action: one small batch per click; no automatic loops or retries.
+document.getElementById('exam-supported-languages').addEventListener('click', async event => {
+  const button = event.target.closest('[data-translate-language]');
+  if (!button) return;
+  const examId = Number(button.dataset.examId);
+  const languageCode = button.dataset.translateLanguage;
+  if (!Number.isInteger(examId) || !languageCode) return;
+  button.disabled = true;
+  showFormMessage(`Translating up to 5 questions into ${languageCode}...`);
+  try {
+    const result = await apiRequest(`${API_URL}/${examId}/translate-missing`, {
+      method: 'POST', body: JSON.stringify({ language_code: languageCode, limit: 5 })
+    });
+    showFormMessage(`Translated ${result.translated_texts} texts across ${result.processed_questions} questions. Review before enabling.`, 'success');
+    // Refresh coverage, but keep the edit dialog and unsaved form fields in place.
+    const latest = await apiRequest(API_URL);
+    exams = latest.exams || [];
+    const updated = exams.find(exam => Number(exam.id) === examId);
+    if (updated) renderSupportedLanguages(updated);
+  } catch (error) {
+    showFormMessage(error.message, 'error');
+    button.disabled = false;
+  }
+});
+
+// Explicit metadata translation; only refresh blank title input to preserve unsaved edits.
+document.getElementById('exam-supported-languages').addEventListener('click', async event => {
+  const button = event.target.closest('[data-translate-metadata]');
+  if (!button) return;
+  const examId = Number(button.dataset.examId);
+  const languageCode = button.dataset.translateMetadata;
+  if (!Number.isInteger(examId) || !languageCode) return;
+  button.disabled = true;
+  showFormMessage(`Translating missing title and topics into ${languageCode}...`);
+  try {
+    const result = await apiRequest(`${API_URL}/${examId}/translate-metadata`, {
+      method: 'POST', body: JSON.stringify({ language_code: languageCode })
+    });
+    const latest = await apiRequest(API_URL);
+    exams = latest.exams || [];
+    const updated = exams.find(exam => Number(exam.id) === examId);
+    if (updated) {
+      const input = document.getElementById(`translation-title-${languageCode}`);
+      if (input && !input.value.trim()) input.value = updated.translations?.[languageCode]?.title || '';
+      renderSupportedLanguages(updated);
+    }
+    showFormMessage(`Title translated: ${result.translated_title ? 'yes' : 'no'}; topics translated: ${result.translated_topics}. Review before enabling.`, 'success');
+  } catch (error) {
+    showFormMessage(error.message, 'error');
+    button.disabled = false;
+  }
+});
+
+// Review queue is rendered in the edit modal, without navigating away from unsaved form fields.
+let reviewPage = 1;
+let reviewContext = null;
+async function loadReviewQueue() {
+  if (!reviewContext) return;
+  const {examId, languageCode} = reviewContext;
+  const panel = document.getElementById('exam-review-panel');
+  panel.textContent = 'Loading review items...';
+  try {
+    const data = await apiRequest(`${API_URL}/${examId}/review-queue?language_code=${encodeURIComponent(languageCode)}&page=${reviewPage}`);
+    const summary = data.summary || {};
+    const totals = Object.values(summary).reduce((a,v)=>({total:a.total+Number(v.total||0),reviewed:a.reviewed+Number(v.reviewed||0)}),{total:0,reviewed:0});
+    panel.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><strong>Review ${escapeHTML(languageCode)} — ${totals.reviewed}/${totals.total} approved</strong><button type="button" data-review-close>Close</button></div>
+      <p style="font-size:13px">Review each English source against the translation. Any later edit invalidates approval. Only translations that exist are listed; complete missing translations first.</p>
+      <div style="margin:12px 0"><button type="button" data-review-all ${totals.total===totals.reviewed||data.public_enabled?'disabled':''}>Approve all translated (${totals.total-totals.reviewed} pending)</button></div>
+      <div id="exam-review-items"></div>
+      <div style="display:flex;gap:12px;align-items:center"><button type="button" data-review-prev ${reviewPage===1?'disabled':''}>Previous</button><span>Page ${reviewPage} / ${Math.max(1,Math.ceil(data.total/data.limit))}</span><button type="button" data-review-next ${reviewPage*data.limit>=data.total?'disabled':''}>Next</button></div>`;
+    const list=panel.querySelector('#exam-review-items');
+    for (const item of data.items) {
+      const div=document.createElement('div');
+      div.style.cssText='border-top:1px solid #ddd;padding:12px 0';
+      div.innerHTML=`<div><strong>${escapeHTML(item.entity_type)} #${Number(item.entity_id)}</strong> — ${item.reviewed?'Approved':'Pending'}</div>
+        <div style="font-size:13px;margin:6px 0;white-space:pre-wrap"><strong>English:</strong> ${escapeHTML(item.source_text)}</div>
+        <div style="font-size:13px;margin:6px 0;white-space:pre-wrap"><strong>${escapeHTML(languageCode)}:</strong> ${escapeHTML(item.translated_text)}</div>
+        <button type="button" data-approve-review ${item.reviewed||data.public_enabled?'disabled':''}>${item.reviewed?'Approved':'Approve translation'}</button>`;
+      const button=div.querySelector('[data-approve-review]');
+      button.addEventListener('click',async()=>{
+        button.disabled=true;
+        try {
+          await apiRequest(`${API_URL}/${examId}/review-item`,{method:'POST',body:JSON.stringify({language_code:languageCode,entity_type:item.entity_type,entity_id:Number(item.entity_id),reviewed_text:item.translated_text})});
+          await loadReviewQueue();
+        } catch(error) {showFormMessage(error.message,'error');button.disabled=false;}
+      });
+      list.appendChild(div);
+    }
+  } catch(error) {panel.textContent=error.message;}
+}
+document.getElementById('exam-supported-languages').addEventListener('click',event=>{
+  const button=event.target.closest('[data-review-language]');
+  if (!button) return;
+  reviewContext={examId:Number(button.dataset.examId),languageCode:button.dataset.reviewLanguage};
+  reviewPage=1;
+  let panel=document.getElementById('exam-review-panel');
+  if (!panel) {
+    panel=document.createElement('section');
+    panel.id='exam-review-panel';
+    panel.style.cssText='padding:16px;margin-top:12px;border:1px solid #bbb;border-radius:8px;max-height:55vh;overflow:auto';
+    document.getElementById('exam-supported-languages').after(panel);
+  }
+  panel.hidden=false;
+  loadReviewQueue();
+});
+document.addEventListener('click',async event=>{
+  if(event.target.closest('[data-review-all]')) {
+    if (!reviewContext) return;
+    const {examId,languageCode}=reviewContext;
+    if (!window.confirm(`Approve ALL existing translations for ${languageCode} in this exam, across every page? Only proceed after reviewing their contents. Missing translations will not be approved or created.`)) return;
+    const btn=event.target.closest('[data-review-all]');
+    btn.disabled=true;
+    try {
+      const result=await apiRequest(`${API_URL}/${examId}/review-all`,{method:'POST',body:JSON.stringify({language_code:languageCode,confirm_all:true})});
+      await loadReviewQueue();
+      showFormMessage(`Bulk review approved ${result.approved} translations. Missing translations remain pending.`, 'success');
+    } catch(err) {
+      btn.disabled=false;
+      showFormMessage(err.message || 'Bulk approval failed.', 'error');
+    }
+    return;
+  }
+  if(event.target.closest('[data-review-close]')) {document.getElementById('exam-review-panel').hidden=true;reviewContext=null;}
+  if(event.target.closest('[data-review-prev]')&&reviewPage>1) {reviewPage--;loadReviewQueue();}
+  if(event.target.closest('[data-review-next]')) {reviewPage++;loadReviewQueue();}
+});
