@@ -503,6 +503,7 @@ async function loadReviewQueue() {
     const totals = Object.values(summary).reduce((a,v)=>({total:a.total+Number(v.total||0),reviewed:a.reviewed+Number(v.reviewed||0)}),{total:0,reviewed:0});
     panel.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><strong>Review ${escapeHTML(languageCode)} — ${totals.reviewed}/${totals.total} approved</strong><button type="button" data-review-close>Close</button></div>
       <p style="font-size:13px">Review each English source against the translation. Any later edit invalidates approval. Only translations that exist are listed; complete missing translations first.</p>
+      <div style="margin:12px 0"><button type="button" data-review-all ${totals.total===totals.reviewed||data.public_enabled?'disabled':''}>Approve all translated (${totals.total-totals.reviewed} pending)</button></div>
       <div id="exam-review-items"></div>
       <div style="display:flex;gap:12px;align-items:center"><button type="button" data-review-prev ${reviewPage===1?'disabled':''}>Previous</button><span>Page ${reviewPage} / ${Math.max(1,Math.ceil(data.total/data.limit))}</span><button type="button" data-review-next ${reviewPage*data.limit>=data.total?'disabled':''}>Next</button></div>`;
     const list=panel.querySelector('#exam-review-items');
@@ -540,7 +541,23 @@ document.getElementById('exam-supported-languages').addEventListener('click',eve
   panel.hidden=false;
   loadReviewQueue();
 });
-document.addEventListener('click',event=>{
+document.addEventListener('click',async event=>{
+  if(event.target.closest('[data-review-all]')) {
+    if (!reviewContext) return;
+    const {examId,languageCode}=reviewContext;
+    if (!window.confirm(`Approve ALL existing translations for ${languageCode} in this exam, across every page? Only proceed after reviewing their contents. Missing translations will not be approved or created.`)) return;
+    const btn=event.target.closest('[data-review-all]');
+    btn.disabled=true;
+    try {
+      const result=await apiRequest(`${API_URL}/${examId}/review-all`,{method:'POST',body:JSON.stringify({language_code:languageCode,confirm_all:true})});
+      await loadReviewQueue();
+      showFormMessage(`Bulk review approved ${result.approved} translations. Missing translations remain pending.`, 'success');
+    } catch(err) {
+      btn.disabled=false;
+      showFormMessage(err.message || 'Bulk approval failed.', 'error');
+    }
+    return;
+  }
   if(event.target.closest('[data-review-close]')) {document.getElementById('exam-review-panel').hidden=true;reviewContext=null;}
   if(event.target.closest('[data-review-prev]')&&reviewPage>1) {reviewPage--;loadReviewQueue();}
   if(event.target.closest('[data-review-next]')) {reviewPage++;loadReviewQueue();}

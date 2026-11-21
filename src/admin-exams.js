@@ -200,6 +200,60 @@ async function handleReviewItem(id, request, env) {
   return jsonResponse({success:true});
 }
 
+// Bulk approval is explicit and scoped to one configured, non-public exam language.
+// It never creates missing translations or changes public language availability.
+async function handleReviewAll(id, request, env) {
+  const body = await request.json().catch(() => null);
+  const language = body?.language_code;
+  if (typeof language !== 'string' || !body?.confirm_all) {
+    return jsonResponse({error:'Explicit bulk approval confirmation required.'},400);
+  }
+  const config = await env.DB.prepare(`
+    SELECT el.is_enabled FROM exam_languages el
+    JOIN languages l ON l.code=el.language_code AND l.is_enabled=1
+    WHERE el.exam_id=? AND el.language_code=?
+  `).bind(id,language).first();
+  if (!config || Number(config.is_enabled)===1) {
+    return jsonResponse({error:'Bulk review requires a configured, non-public language.'},409);
+  }
+  const before = await reviewStatus(env,id,language);
+  const pending = Object.values(before).reduce((n,v)=>n+v.total-v.reviewed,0);
+  if (pending===0) return jsonResponse({success:true,approved:0,summary:before});
+
+  // Capture current text from the same published content scope as reviewStatus.
+  // One atomic INSERT...SELECT prevents partial approval and skips already-approved rows.
+  await env.DB.prepare(`
+    INSERT INTO translation_reviews (exam_id,language_code,entity_type,entity_id,reviewed_text)
+    SELECT ?, ?, x.entity_type, x.entity_id, x.translated_text
+    FROM (
+      SELECT 'title' AS entity_type, et.exam_id AS entity_id, et.title AS translated_text
+      FROM exam_translations et WHERE et.exam_id=? AND et.language_code=? AND TRIM(et.title)<>''
+      UNION ALL
+      SELECT 'topic', t.id, tt.name FROM topics t
+      JOIN topic_translations tt ON tt.topic_id=t.id AND tt.language_code=?
+      WHERE t.exam_id=? AND TRIM(tt.name)<>'' AND EXISTS (
+        SELECT 1 FROM questions q WHERE q.topic_id=t.id AND q.status='published')
+      UNION ALL
+      SELECT 'question', q.id, qt.question_text FROM questions q
+      JOIN question_translations qt ON qt.question_id=q.id AND qt.language_code=?
+      WHERE q.exam_id=? AND q.status='published' AND TRIM(qt.question_text)<>''
+      UNION ALL
+      SELECT 'option', o.id, ot.option_text FROM question_options o
+      JOIN questions q ON q.id=o.question_id
+      JOIN option_translations ot ON ot.option_id=o.id AND ot.language_code=?
+      WHERE q.exam_id=? AND q.status='published' AND TRIM(ot.option_text)<>''
+    ) x
+    LEFT JOIN translation_reviews r ON r.exam_id=? AND r.language_code=?
+      AND r.entity_type=x.entity_type AND r.entity_id=x.entity_id
+    WHERE r.reviewed_text IS NULL OR r.reviewed_text<>x.translated_text
+    ON CONFLICT(exam_id,language_code,entity_type,entity_id)
+    DO UPDATE SET reviewed_text=excluded.reviewed_text, reviewed_at=CURRENT_TIMESTAMP
+  `).bind(id,language,id,language,language,id,language,id,language,id,id,language).run();
+  const after = await reviewStatus(env,id,language);
+  const remaining = Object.values(after).reduce((n,v)=>n+v.total-v.reviewed,0);
+  return jsonResponse({success:true,approved:pending-remaining,remaining,summary:after});
+}
+
 function validateSlug(slug) {
   return typeof slug === "string" &&
     /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug);
@@ -1007,6 +1061,11 @@ export async function handleAdminExams(request, env) {
     const language=url.searchParams.get('language_code');
     if (!language || !Number.isSafeInteger(page) || page<1 || page>100000) return jsonResponse({error:'Invalid request.'},400);
     return handleReviewQueue(Number(queueMatch[1]),language,page,env);
+  }
+  const reviewAllMatch = url.pathname.match(/^\/api\/admin\/exams\/(\d+)\/review-all$/);
+  if (reviewAllMatch) {
+    if (method !== 'POST') return jsonResponse({error:'Method not allowed.'},405);
+    return handleReviewAll(Number(reviewAllMatch[1]),request,env);
   }
   const reviewMatch = url.pathname.match(/^\/api\/admin\/exams\/(\d+)\/review-item$/);
   if (reviewMatch) {
