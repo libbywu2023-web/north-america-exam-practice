@@ -121,7 +121,9 @@ const pathname = location.pathname.toLowerCase();
 let exam = null;
 
 // Clean URL path takes priority over legacy query parameters.
-if (pathname.startsWith("/zh-tw/")) {
+if (pathname.startsWith("/fr/")) {
+  exam = pathname.slice("/fr/".length);
+} else if (pathname.startsWith("/zh-tw/")) {
   exam = pathname.slice("/zh-tw/".length);
 } else if (pathname.startsWith("/zh/")) {
   exam = pathname.slice("/zh/".length);
@@ -130,7 +132,8 @@ if (pathname.startsWith("/zh-tw/")) {
   pathname !== "/practice" &&
   pathname !== "/" &&
   pathname !== "/zh" &&
-  pathname !== "/zh-tw"
+  pathname !== "/zh-tw" &&
+  pathname !== "/fr"
 ) {
   exam = pathname.replace(/^\/|\/$/g, "");
 }
