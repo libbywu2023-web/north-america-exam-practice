@@ -53,14 +53,6 @@ function validateCountryInput(body, languages) {
     }
   }
 
-  for (const language of languages) {
-    const name = body.translations[language.code];
-
-    if (typeof name !== "string" || !name.trim()) {
-      return `Translation required for ${language.code}.`;
-    }
-  }
-
   if (!body.translations.en) {
     return "English translation is required.";
   }

@@ -30,32 +30,26 @@ function validateSlug(slug) {
 }
 
 function validateTranslations(translations, languages) {
-  if (
-    !translations ||
-    typeof translations !== "object" ||
-    Array.isArray(translations)
-  ) {
-    return false;
-  }
-
-  return languages.every(language => {
-    const value = translations[language.code];
-
-    return typeof value === "string" &&
-      value.trim().length > 0 &&
-      value.trim().length <= 150;
-  });
+  if (!translations || typeof translations !== "object" || Array.isArray(translations)) return false;
+  const allowed = new Set(languages.map(language => language.code));
+  if (!Object.keys(translations).every(code => allowed.has(code))) return false;
+  if (typeof translations.en !== "string" || !translations.en.trim()) return false;
+  return Object.values(translations).every(value =>
+    typeof value === "string" && value.length <= 150
+  );
 }
 
 function cleanTranslations(translations, languages) {
   const result = {};
-
   for (const language of languages) {
-    result[language.code] = translations[language.code].trim();
+    const value = translations[language.code];
+    if (typeof value === "string" && value.trim()) {
+      result[language.code] = value.trim();
+    }
   }
-
   return result;
 }
+
 
 // GET /api/admin/categories
 async function listCategories(env) {
@@ -124,7 +118,7 @@ async function createCategory(request, env) {
 
   if (!validateTranslations(body.translations, languages)) {
     return jsonResponse({
-      error: "Please provide a name for every enabled language. Names must be 150 characters or fewer."
+      error: "Please provide an English name; optional translations must be 150 characters or fewer."
     }, 400);
   }
 
@@ -143,14 +137,14 @@ async function createCategory(request, env) {
       VALUES (?, ?)
     `).bind(slug, defaultName),
 
-    ...languages.map(language =>
+    ...Object.keys(translations).map(code =>
       env.DB.prepare(`
         INSERT INTO exam_category_translations
           (category_id, language_code, name)
         SELECT id, ?, ?
         FROM exam_categories
         WHERE slug = ?
-      `).bind(language.code, translations[language.code], slug)
+      `).bind(code, translations[code], slug)
     ),
 
     env.DB.prepare(`
@@ -205,7 +199,7 @@ async function updateCategory(id, request, env) {
 
   if (!validateTranslations(body.translations, languages)) {
     return jsonResponse({
-      error: "Please provide a name for every enabled language. Names must be 150 characters or fewer."
+      error: "Please provide an English name; optional translations must be 150 characters or fewer."
     }, 400);
   }
 
@@ -235,14 +229,14 @@ async function updateCategory(id, request, env) {
       WHERE id = ?
     `).bind(slug, defaultName, id),
 
-    ...languages.map(language =>
+    ...Object.keys(translations).map(code =>
       env.DB.prepare(`
         INSERT INTO exam_category_translations
           (category_id, language_code, name)
         VALUES (?, ?, ?)
         ON CONFLICT(category_id, language_code)
         DO UPDATE SET name = excluded.name
-      `).bind(id, language.code, translations[language.code])
+      `).bind(id, code, translations[code])
     ),
 
     env.DB.prepare(`

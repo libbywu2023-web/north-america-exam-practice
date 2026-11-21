@@ -30,38 +30,33 @@ function validateSlug(slug) {
 }
 
 function validateTranslations(translations, languages) {
-  if (
-    !translations ||
-    typeof translations !== "object" ||
-    Array.isArray(translations)
-  ) {
-    return false;
-  }
-
-  return languages.every(language => {
-    const item = translations[language.code];
-
-    return item &&
-      typeof item.title === "string" &&
-      item.title.trim().length > 0 &&
-      item.title.trim().length <= 200 &&
-      typeof item.description === "string" &&
-      item.description.trim().length <= 2000;
+  if (!translations || typeof translations !== "object" || Array.isArray(translations)) return false;
+  const allowed = new Set(languages.map(language => language.code));
+  if (!Object.keys(translations).every(code => allowed.has(code))) return false;
+  const english = translations.en;
+  if (!english || typeof english.title !== "string" || !english.title.trim()) return false;
+  return Object.values(translations).every(item => {
+    if (!item || typeof item !== "object") return false;
+    const title = item.title ?? "";
+    const description = item.description ?? "";
+    return typeof title === "string" && title.length <= 200 &&
+      typeof description === "string" && description.length <= 2000;
   });
 }
 
 function cleanTranslations(translations, languages) {
   const result = {};
-
   for (const language of languages) {
-    result[language.code] = {
-      title: translations[language.code].title.trim(),
-      description: translations[language.code].description.trim()
-    };
+    const item = translations[language.code];
+    if (item && typeof item.title === "string" && item.title.trim()) {
+      result[language.code] = {
+        title: item.title.trim(), description: (item.description || "").trim()
+      };
+    }
   }
-
   return result;
 }
+
 
 function validateExamFields(body) {
   const regionId = Number(body.region_id);
@@ -109,7 +104,7 @@ function validateExamFields(body) {
     return { error: "Invalid exam status." };
   }
 
-  if (!["en", "zh-CN", "zh-TW"].includes(defaultLanguage)) {
+  if (typeof defaultLanguage !== "string" || !/^[a-z]{2,3}(?:-[A-Za-z]{2,4})?$/.test(defaultLanguage)) {
     return { error: "Invalid default language." };
   }
 
@@ -293,7 +288,7 @@ async function createExam(request, env) {
 
   if (!validateTranslations(body.translations, languages)) {
     return jsonResponse({
-      error: "Please provide a title and description for every enabled language."
+      error: "Please provide an English title; other language translations are optional."
     }, 400);
   }
 
@@ -331,7 +326,7 @@ async function createExam(request, env) {
       showNewBadge ? 1 : 0
     ),
 
-    ...languages.map(language =>
+    ...Object.keys(translations).map(code =>
       env.DB.prepare(`
         INSERT INTO exam_translations (
           exam_id,
@@ -343,9 +338,9 @@ async function createExam(request, env) {
         FROM exams
         WHERE slug = ?
       `).bind(
-        language.code,
-        translations[language.code].title,
-        translations[language.code].description,
+        code,
+        translations[code].title,
+        translations[code].description,
         slug
       )
     ),
@@ -443,7 +438,7 @@ async function updateExam(id, request, env) {
 
   if (!validateTranslations(body.translations, languages)) {
     return jsonResponse({
-      error: "Please provide a title and description for every enabled language."
+      error: "Please provide an English title; other language translations are optional."
     }, 400);
   }
 
@@ -482,7 +477,7 @@ async function updateExam(id, request, env) {
       id
     ),
 
-    ...languages.map(language =>
+    ...Object.keys(translations).map(code =>
       env.DB.prepare(`
         INSERT INTO exam_translations (
           exam_id,
@@ -497,9 +492,9 @@ async function updateExam(id, request, env) {
           description = excluded.description
       `).bind(
         id,
-        language.code,
-        translations[language.code].title,
-        translations[language.code].description
+        code,
+        translations[code].title,
+        translations[code].description
       )
     ),
 
