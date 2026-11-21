@@ -11,6 +11,19 @@ localStorage.setItem("exam-language", lang);
 setLanguageSelect(lang);
 document.documentElement.lang = lang;
 const homeCopy = {
+  fr: {
+    heroTitle: "Tests de préparation gratuits aux examens du monde entier",
+    heroSlogan: "Pratiquez. Préparez-vous. Réussissez.",
+    heroDescription: "Préparez votre prochain examen grâce à des questions d’entraînement gratuites. Explorez les examens de conduite, les permis et d’autres ressources par pays et par région.",
+    searchPlaceholder: "Rechercher un examen...", searchAria: "Rechercher des examens", searchButton: "Rechercher",
+    categoryHeading: "Explorer par catégorie", categoryAll: "Tous les examens", categoryDriving: "Examens de conduite", categoryImmigration: "Immigration et citoyenneté", categoryProfessional: "Certifications professionnelles", categoryOther: "Autres examens",
+    footerDescription: "Des ressources gratuites de préparation aux examens pour les apprenants du monde entier.",
+    about: "À propos", privacy: "Politique de confidentialité", contact: "Contact", footerNav: "Informations",
+    disclaimer: "Global Exam Practice est une ressource éducative indépendante, sans affiliation avec un gouvernement ou un organisme d’examen.",
+    copyright: "© 2026 Global Exam Practice. Tous droits réservés.",
+    brandHome: "Accueil de Global Exam Practice", pageTitle: "Global Exam Practice — Préparation gratuite aux examens",
+    metaDescription: "Tests de préparation gratuits aux examens standardisés du monde entier. Trouvez des ressources par pays et région."
+  },
   en: {
     heroTitle: "Free Online Practice Tests for Exams Worldwide",
     heroSlogan: "Practice. Prepare. Succeed.",
@@ -117,36 +130,43 @@ if (searchForm) {
 
 const labels = {
   loading: {
+    fr: "Chargement des examens...",
     en: "Loading exams...",
     "zh-CN": "正在加载考试目录...",
     "zh-TW": "正在載入考試目錄..."
   },
   noResults: {
+    fr: "Aucun examen correspondant.",
     en: "No matching exams found.",
     "zh-CN": "没有找到匹配的考试。",
     "zh-TW": "沒有找到符合的考試。"
   },
   loadError: {
+    fr: "Impossible de charger les examens. Veuillez réessayer.",
     en: "Unable to load the exam catalog. Please try again later.",
     "zh-CN": "暂时无法加载考试目录，请稍后再试。",
     "zh-TW": "暫時無法載入考試目錄，請稍後再試。"
   },
     viewMore: {
+    fr: "Voir plus d’examens",
     en: "View more exams",
     "zh-CN": "查看更多考试",
     "zh-TW": "查看更多考試"
   },
   viewLess: {
+    fr: "Voir moins d’examens",
     en: "View fewer exams",
     "zh-CN": "收起考试",
     "zh-TW": "收起考試"
   },
   otherCountries: {
+    fr: "Autres pays",
     en: "Other Countries",
     "zh-CN": "其他国家",
     "zh-TW": "其他國家"
   },
   otherCountriesDescription: {
+    fr: "D’autres pays et ressources seront ajoutés.",
     en: "More countries and exam resources will be added.",
     "zh-CN": "我们将陆续添加更多国家和考试资源。",
     "zh-TW": "我們將陸續新增更多國家和考試資源。"
@@ -219,7 +239,8 @@ function createExamLink(exam) {
   const effective = supported.includes(lang) ? lang :
     supported.includes(exam.default_language) ? exam.default_language :
     supported.includes('en') ? 'en' : supported[0];
-  if (effective === 'zh-CN') link.href = `/zh/${slug}`;
+  if (effective === 'fr') link.href = `/fr/${slug}`;
+  else if (effective === 'zh-CN') link.href = `/zh/${slug}`;
   else if (effective === 'zh-TW') link.href = `/zh-tw/${slug}`;
   else link.href = `/${slug}`;
 
@@ -345,7 +366,7 @@ function renderCatalog(query = "") {
       const regionName = createElement(
         "div",
         "catalog-region-name",
-        region.code === "ALL" ? (lang === "en" ? "National" : lang === "zh-CN" ? "全国" : "全國") : region.name
+        region.code === "ALL" ? (lang === "en" ? "National" : lang === "fr" ? "National" : lang === "zh-CN" ? "全国" : "全國") : region.name
       );
 
       const examsContainer = createElement(

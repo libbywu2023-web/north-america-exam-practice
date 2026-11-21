@@ -3,6 +3,7 @@ import { api, copy, getLanguage, setLanguageSelect, setHomeLinks } from "./commo
 const lang = getLanguage();
 const t = copy[lang];
 const practiceLabels = {
+  fr: { position: (n,total) => `Question ${n} sur ${total}`, perSet: n => `${n} questions par série` },
   en: { position: (n,total) => `Question ${n} of ${total}`, perSet: n => `${n} questions per set` },
   "zh-CN": { position: (n,total) => `第 ${n} / ${total} 题`, perSet: n => `每组 ${n} 题` },
   "zh-TW": { position: (n,total) => `第 ${n} / ${total} 題`, perSet: n => `每組 ${n} 題` }
@@ -55,7 +56,9 @@ function updateSeo(examInfo) {
     `${examInfo.title} practice questions on Exam Practice.`;
 
   const canonicalPath =
-    lang === "zh-CN"
+    lang === "fr"
+      ? `/fr/${encodeURIComponent(exam)}`
+      : lang === "zh-CN"
       ? `/zh/${encodeURIComponent(exam)}`
       : lang === "zh-TW"
         ? `/zh-tw/${encodeURIComponent(exam)}`
@@ -65,6 +68,7 @@ function updateSeo(examInfo) {
 
   const localeMap = {
     en: "en_CA",
+    fr: "fr_CA",
     "zh-CN": "zh_CN",
     "zh-TW": "zh_TW"
   };
@@ -490,7 +494,7 @@ function render() {
   }
   const setLabel = document.querySelector("#set-label");
   if (setLabel) setLabel.textContent = topic ? "" :
-    ({en:`Set ${setNumber}`,"zh-CN":`第 ${setNumber} 组`,"zh-TW":`第 ${setNumber} 組`}[lang]);
+    ({fr:`Série ${setNumber}`,en:`Set ${setNumber}`,"zh-CN":`第 ${setNumber} 组`,"zh-TW":`第 ${setNumber} 組`}[lang]);
 
   renderQuestionImages(q.images || []);
 
@@ -667,17 +671,18 @@ document.querySelector("#retry").addEventListener("click", () => {
 // A new set is available only after every question has been answered.
 const anotherSetButton = document.querySelector("#another-set");
 if (anotherSetButton) document.querySelector("#another-set-label").textContent = ({
-  en: "Try Another Set", "zh-CN": "再做一组新题", "zh-TW": "再做一組新題"
+  fr: "Essayer une autre série", en: "Try Another Set", "zh-CN": "再做一组新题", "zh-TW": "再做一組新題"
 })[lang];
 const setInfo = document.querySelector("#set-info");
 const setHelp = document.querySelector("#set-info-text");
 if (setHelp) setHelp.textContent = ({
   en: "Answer every question in this set to unlock the next set. Correct answers are not required. Each new set is randomly selected, so some questions may repeat.",
+  fr: "Terminez toutes les questions de cette série pour débloquer la suivante, que vos réponses soient correctes ou non. Certaines questions peuvent se répéter.",
   "zh-CN": "完成当前组的全部题目后即可解锁下一组，无论答对或答错。每组随机抽题，因此可能有少量题目重复。",
   "zh-TW": "完成目前組的全部題目後即可解鎖下一組，無論答對或答錯。每組隨機抽題，因此可能有少量題目重複。"
 })[lang];
 if (setInfo) setInfo.setAttribute("aria-label", ({
-  en: "About practice sets", "zh-CN": "关于练习题组", "zh-TW": "關於練習題組"
+  fr: "À propos des séries", en: "About practice sets", "zh-CN": "关于练习题组", "zh-TW": "關於練習題組"
 })[lang]);
 setInfo?.addEventListener("click", () => {
   if (!setHelp) return;
@@ -688,6 +693,7 @@ anotherSetButton?.addEventListener("click", async () => {
   if (isLoadingSet || topic || !questions.length ||
       !questions.every(q => (answerResults.get(String(q.id)) || answerResults.get(q.id))?.submitted)) return;
   const message = ({en:"Start another random set? Some questions may repeat.",
+    fr:"Commencer une nouvelle série de questions aléatoires? Certaines questions peuvent se répéter.",
     "zh-CN":"开始另一组随机题目？部分题目可能重复。",
     "zh-TW":"開始另一組隨機題目？部分題目可能重複。"})[lang];
   if (!confirm(message)) return;

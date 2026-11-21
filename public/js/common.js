@@ -1,4 +1,12 @@
 export const copy = {
+  fr: {
+    allExams: "Tous les examens", practice: "Questions d’entraînement", mock: "Commencer l’examen blanc",
+    question: "Question", completed: "Terminé", choose: "Choisissez une réponse", check: "Vérifier la réponse", retry: "Recommencer", confirmRetry: "Recommencer cette séance? Toutes les réponses seront effacées.",
+    previous: "Précédent", next: "Suivant", correct: "Bonne réponse!", incorrect: "Pas tout à fait.",
+    correctAnswer: "Bonne réponse", loading: "Chargement…", submit: "Soumettre l’examen",
+    passed: "Réussi!", notPassed: "Pas encore réussi", score: "Votre résultat",
+    noQuestions: "Aucune question n’est encore disponible dans cette langue.",
+  },
   en: {
     allExams: "All exams", practice: "Practice questions", mock: "Start mock test",
     question: "Question", completed: "Completed", choose: "Choose one answer", check: "Check answer", retry: "Retry", confirmRetry: "Restart this practice session? All answers will be cleared.",
@@ -27,6 +35,8 @@ export const copy = {
 export function getLanguage() {
   const pathname = location.pathname.toLowerCase();
 
+  if (pathname === "/fr" || pathname.startsWith("/fr/")) return "fr";
+
   // Language prefixes in clean URLs take priority.
   if (pathname === "/zh" || pathname.startsWith("/zh/")) {
     return "zh-CN";
@@ -40,7 +50,7 @@ export function getLanguage() {
   const params = new URLSearchParams(location.search);
   const queryLang = params.get("lang");
 
-  if (["en", "zh-CN", "zh-TW"].includes(queryLang)) {
+  if (["en", "fr", "zh-CN", "zh-TW"].includes(queryLang)) {
     return queryLang;
   }
 
@@ -59,11 +69,12 @@ export function getLanguage() {
   // Retain the saved preference for other existing pages.
   const saved = localStorage.getItem("exam-language");
 
-  return ["en", "zh-CN", "zh-TW"].includes(saved) ? saved : "en";
+  return ["en", "fr", "zh-CN", "zh-TW"].includes(saved) ? saved : "en";
 }
 // The homepage preference is independent of the language used by an exam.
 export function getHomePath() {
   const preferred = localStorage.getItem("exam-language");
+  if (preferred === "fr") return "/fr";
   if (preferred === "zh-CN") return "/zh";
   if (preferred === "zh-TW") return "/zh-tw";
   return "/";
@@ -115,7 +126,7 @@ export function setLanguageSelect(lang) {
 
     // Only homepage language changes update the persistent site preference.
     const homePathname = location.pathname.toLowerCase();
-    if (["/", "/zh", "/zh-tw"].includes(homePathname)) {
+    if (["/", "/fr", "/zh", "/zh-tw"].includes(homePathname)) {
       localStorage.setItem("exam-language", newLang);
     }
 
@@ -125,11 +136,14 @@ export function setLanguageSelect(lang) {
     // Identify the current exam slug.
     let exam = params.get("exam");
 
-    if (pathname.startsWith("/zh-tw/")) {
+    if (pathname.startsWith("/fr/")) {
+      exam = pathname.slice("/fr/".length);
+    } else if (pathname.startsWith("/zh-tw/")) {
       exam = pathname.slice("/zh-tw/".length);
     } else if (pathname.startsWith("/zh/")) {
       exam = pathname.slice("/zh/".length);
         } else if (
+      pathname !== "/fr" &&
       pathname !== "/zh" &&
       pathname !== "/zh-tw" &&
       pathname !== "/practice" &&
@@ -146,7 +160,9 @@ export function setLanguageSelect(lang) {
     let newPath = "/";
 
     if (exam) {
-      if (newLang === "zh-CN") {
+      if (newLang === "fr") {
+        newPath = `/fr/${exam}`;
+      } else if (newLang === "zh-CN") {
         newPath = `/zh/${exam}`;
       } else if (newLang === "zh-TW") {
         newPath = `/zh-tw/${exam}`;
@@ -154,7 +170,9 @@ export function setLanguageSelect(lang) {
         newPath = `/${exam}`;
       }
     } else {
-      if (newLang === "zh-CN") {
+      if (newLang === "fr") {
+        newPath = "/fr";
+      } else if (newLang === "zh-CN") {
         newPath = "/zh";
       } else if (newLang === "zh-TW") {
         newPath = "/zh-tw";

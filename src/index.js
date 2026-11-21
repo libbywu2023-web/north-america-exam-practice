@@ -26,7 +26,7 @@ function getClientId(request) {
 }
 
 function languageOrDefault(value) {
-  return ["en", "zh-CN", "zh-TW"].includes(value) ? value : "en";
+  return ["en", "fr", "zh-CN", "zh-TW"].includes(value) ? value : "en";
 }
 
 // A missing association or a Preparing language must never be served publicly.
@@ -49,7 +49,7 @@ async function examLanguagePolicy(db, slug) {
 }
 
 function languagePath(lang, slug) {
-  const prefix = lang === 'zh-CN' ? '/zh' : lang === 'zh-TW' ? '/zh-tw' : '';
+  const prefix = lang === 'zh-CN' ? '/zh' : lang === 'zh-TW' ? '/zh-tw' : lang === 'fr' ? '/fr' : '';
   return `${prefix}/${slug}`;
 }
 
@@ -728,10 +728,12 @@ export default {
         return await handlePublicImage(request, env);
       }
 
-      // Handle clean homepage URLs for Chinese languages.
+      // Handle localized homepage URLs.
       if (
         request.method === "GET" &&
-        (url.pathname === "/zh" ||
+        (url.pathname === "/fr" ||
+          url.pathname === "/fr/" ||
+          url.pathname === "/zh" ||
           url.pathname === "/zh/" ||
           url.pathname === "/zh-tw" ||
           url.pathname === "/zh-tw/")
@@ -749,6 +751,8 @@ export default {
         let examSlug = null;
         let routeLang = "en";
 
+        const frenchMatch = url.pathname.match(/^\/fr\/([a-z0-9-]+)\/?$/);
+
         const simplifiedMatch = url.pathname.match(
           /^\/zh\/([a-z0-9-]+)\/?$/
         );
@@ -761,7 +765,10 @@ export default {
           /^\/([a-z0-9-]+)\/?$/
         );
 
-        if (simplifiedMatch) {
+        if (frenchMatch) {
+          examSlug = frenchMatch[1];
+          routeLang = "fr";
+        } else if (simplifiedMatch) {
           examSlug = simplifiedMatch[1];
           routeLang = "zh-CN";
         } else if (traditionalMatch) {
