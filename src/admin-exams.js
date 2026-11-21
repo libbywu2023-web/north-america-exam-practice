@@ -790,6 +790,72 @@ async function translateMissingExamQuestions(id, request, env) {
     message: "Batch saved. Review translations before enabling this language." });
 }
 
+// POST /api/admin/exams/:id/translate-metadata
+// Translate only absent title/topic records; never overwrite existing translations.
+async function translateMissingExamMetadata(id, request, env) {
+  const body = await request.json().catch(() => null);
+  const language = body?.language_code;
+  if (typeof language !== 'string' || language === 'en') {
+    return jsonResponse({ error: 'Choose a non-English target language.' }, 400);
+  }
+  const exam = await env.DB.prepare(`
+    SELECT e.id, el.is_enabled FROM exams e
+    JOIN exam_languages el ON el.exam_id = e.id AND el.language_code = ?
+    JOIN languages l ON l.code = el.language_code AND l.is_enabled = 1
+    WHERE e.id = ?
+  `).bind(language, id).first();
+  if (!exam) return jsonResponse({ error: 'Configure the target language first.' }, 400);
+  if (Number(exam.is_enabled) === 1) {
+    return jsonResponse({ error: 'Disable the public language before translation.' }, 409);
+  }
+  const title = await env.DB.prepare(`
+    SELECT src.title, src.description FROM exam_translations src
+    WHERE src.exam_id = ? AND src.language_code = 'en'
+      AND TRIM(src.title) <> ''
+      AND NOT EXISTS (SELECT 1 FROM exam_translations dest
+        WHERE dest.exam_id = src.exam_id AND dest.language_code = ?)
+  `).bind(id, language).first();
+  const topics = await env.DB.prepare(`
+    SELECT t.id, src.name FROM topics t
+    JOIN topic_translations src ON src.topic_id = t.id AND src.language_code = 'en'
+    WHERE t.exam_id = ? AND TRIM(src.name) <> ''
+      AND EXISTS (SELECT 1 FROM questions q WHERE q.topic_id = t.id AND q.status = 'published')
+      AND NOT EXISTS (SELECT 1 FROM topic_translations dest
+        WHERE dest.topic_id = t.id AND dest.language_code = ?)
+    ORDER BY t.id LIMIT 10
+  `).bind(id, language).all();
+  const rows = topics.results || [];
+  const texts = [...(title ? [title.title] : []), ...rows.map(row => row.name)];
+  if (!texts.length) return jsonResponse({ translated_title: false, translated_topics: 0, complete: true });
+  let translated;
+  try { translated = await translateTexts(texts, language, env); }
+  catch (error) {
+    console.error('Metadata translation failed:', error.message);
+    return jsonResponse({ error: 'Translation service failed; nothing was saved.' }, 502);
+  }
+  if (translated.some(text => !text?.trim()) || (title && translated[0].length > 200)) {
+    return jsonResponse({ error: 'Translation was empty or title exceeded 200 characters.' }, 502);
+  }
+  const statements = [];
+  if (title) statements.push(env.DB.prepare(`
+    INSERT INTO exam_translations (exam_id, language_code, title, description)
+    VALUES (?, ?, ?, '') ON CONFLICT(exam_id, language_code) DO NOTHING
+  `).bind(id, language, translated[0]));
+  for (let i = 0; i < rows.length; i++) {
+    statements.push(env.DB.prepare(`
+      INSERT INTO topic_translations (topic_id, language_code, name)
+      VALUES (?, ?, ?) ON CONFLICT(topic_id, language_code) DO NOTHING
+    `).bind(rows[i].id, language, translated[(title ? 1 : 0) + i]));
+  }
+  try { await env.DB.batch(statements); }
+  catch (error) {
+    console.error('Metadata translation save failed:', error);
+    return jsonResponse({ error: 'Unable to save metadata translations.' }, 500);
+  }
+  return jsonResponse({ translated_title: Boolean(title), translated_topics: rows.length,
+    message: 'Review translated metadata before enabling this language.' });
+}
+
 // Main router
 export async function handleAdminExams(request, env) {
   if (!(await isAdminAuthenticated(request, env))) {
@@ -809,6 +875,12 @@ export async function handleAdminExams(request, env) {
     }
 
     return jsonResponse({ error: "Method not allowed." }, 405);
+  }
+
+  const metadataMatch = url.pathname.match(/^\/api\/admin\/exams\/(\d+)\/translate-metadata$/);
+  if (metadataMatch) {
+    if (method !== 'POST') return jsonResponse({ error: 'Method not allowed.' }, 405);
+    return translateMissingExamMetadata(Number(metadataMatch[1]), request, env);
   }
 
   const translateMatch = url.pathname.match(/^\/api\/admin\/exams\/(\d+)\/translate-missing$/);

@@ -238,6 +238,7 @@ function renderSupportedLanguages(exam = null) {
         Enabled (public)</label>
       <small style="display:block">${escapeHTML(counts)} — ${ready ? 'Ready' : 'Preparing / incomplete'}</small>
       ${exam && selected && !enabled && code !== 'en' ? `<button type="button" data-translate-language="${escapeHTML(code)}" data-exam-id="${Number(exam.id)}" style="margin-top:6px">Translate missing (5 questions)</button>` : ''}
+      ${exam && selected && !enabled && code !== 'en' ? `<button type="button" data-translate-metadata="${escapeHTML(code)}" data-exam-id="${Number(exam.id)}" style="margin-top:6px;margin-left:8px">Translate missing title / topics</button>` : ''}
     </div>`;
   }).join('');
 }
@@ -453,6 +454,34 @@ document.getElementById('exam-supported-languages').addEventListener('click', as
     exams = latest.exams || [];
     const updated = exams.find(exam => Number(exam.id) === examId);
     if (updated) renderSupportedLanguages(updated);
+  } catch (error) {
+    showFormMessage(error.message, 'error');
+    button.disabled = false;
+  }
+});
+
+// Explicit metadata translation; only refresh blank title input to preserve unsaved edits.
+document.getElementById('exam-supported-languages').addEventListener('click', async event => {
+  const button = event.target.closest('[data-translate-metadata]');
+  if (!button) return;
+  const examId = Number(button.dataset.examId);
+  const languageCode = button.dataset.translateMetadata;
+  if (!Number.isInteger(examId) || !languageCode) return;
+  button.disabled = true;
+  showFormMessage(`Translating missing title and topics into ${languageCode}...`);
+  try {
+    const result = await apiRequest(`${API_URL}/${examId}/translate-metadata`, {
+      method: 'POST', body: JSON.stringify({ language_code: languageCode })
+    });
+    const latest = await apiRequest(API_URL);
+    exams = latest.exams || [];
+    const updated = exams.find(exam => Number(exam.id) === examId);
+    if (updated) {
+      const input = document.getElementById(`translation-title-${languageCode}`);
+      if (input && !input.value.trim()) input.value = updated.translations?.[languageCode]?.title || '';
+      renderSupportedLanguages(updated);
+    }
+    showFormMessage(`Title translated: ${result.translated_title ? 'yes' : 'no'}; topics translated: ${result.translated_topics}. Review before enabling.`, 'success');
   } catch (error) {
     showFormMessage(error.message, 'error');
     button.disabled = false;
