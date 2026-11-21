@@ -24,6 +24,71 @@ async function getEnabledLanguages(env) {
   return result.results || [];
 }
 
+async function getExamLanguageData(env) {
+  const [configured, coverage] = await Promise.all([
+    env.DB.prepare(`SELECT exam_id, language_code, is_enabled FROM exam_languages`).all(),
+    env.DB.prepare(`
+      SELECT e.id AS exam_id, l.code AS language_code,
+        CASE WHEN et.title IS NOT NULL AND TRIM(et.title) <> '' THEN 1 ELSE 0 END AS title_ready,
+        (SELECT COUNT(*) FROM questions q WHERE q.exam_id = e.id AND q.status = 'published') AS question_total,
+        (SELECT COUNT(*) FROM questions q JOIN question_translations qt ON qt.question_id = q.id
+         WHERE q.exam_id = e.id AND q.status = 'published' AND qt.language_code = l.code
+           AND TRIM(qt.question_text) <> '') AS question_ready,
+        (SELECT COUNT(*) FROM question_options o JOIN questions q ON q.id = o.question_id
+         WHERE q.exam_id = e.id AND q.status = 'published') AS option_total,
+        (SELECT COUNT(*) FROM question_options o JOIN questions q ON q.id = o.question_id
+         JOIN option_translations ot ON ot.option_id = o.id
+         WHERE q.exam_id = e.id AND q.status = 'published' AND ot.language_code = l.code
+           AND TRIM(ot.option_text) <> '') AS option_ready,
+        (SELECT COUNT(DISTINCT t.id) FROM topics t JOIN questions q ON q.topic_id = t.id
+         WHERE q.exam_id = e.id AND q.status = 'published') AS topic_total,
+        (SELECT COUNT(DISTINCT t.id) FROM topics t JOIN questions q ON q.topic_id = t.id
+         JOIN topic_translations tt ON tt.topic_id = t.id
+         WHERE q.exam_id = e.id AND q.status = 'published' AND tt.language_code = l.code
+           AND TRIM(tt.name) <> '') AS topic_ready
+      FROM exams e CROSS JOIN languages l
+      LEFT JOIN exam_translations et
+        ON et.exam_id = e.id AND et.language_code = l.code
+      WHERE l.is_enabled = 1
+    `).all()
+  ]);
+  const byExam = {};
+  for (const row of configured.results || []) {
+    (byExam[row.exam_id] ||= {})[row.language_code] = { is_enabled: Number(row.is_enabled) };
+  }
+  const byCoverage = {};
+  for (const row of coverage.results || []) {
+    (byCoverage[row.exam_id] ||= {})[row.language_code] = row;
+  }
+  return { byExam, byCoverage };
+}
+
+function parseExamLanguages(input, languages, defaultLanguage) {
+  if (!Array.isArray(input) || !input.length) return { error: 'Select at least one supported language.' };
+  const allowed = new Set(languages.map(language => language.code));
+  const seen = new Set();
+  const rows = [];
+  for (const item of input) {
+    if (!item || typeof item !== 'object' || !allowed.has(item.language_code) ||
+        typeof item.is_enabled !== 'boolean' || seen.has(item.language_code)) {
+      return { error: 'Invalid supported language configuration.' };
+    }
+    seen.add(item.language_code);
+    rows.push({ language_code: item.language_code, is_enabled: item.is_enabled ? 1 : 0 });
+  }
+  if (!seen.has(defaultLanguage)) return { error: 'Default language must be selected as supported.' };
+  return { rows };
+}
+
+function isTranslationReady(coverage, titleOverride = null) {
+  if (!coverage) return false;
+  const titleReady = titleOverride === null ? Number(coverage.title_ready) === 1 : Boolean(titleOverride);
+  return titleReady && Number(coverage.question_total) > 0 &&
+    Number(coverage.question_ready) === Number(coverage.question_total) &&
+    Number(coverage.option_ready) === Number(coverage.option_total) &&
+    Number(coverage.topic_ready) === Number(coverage.topic_total);
+}
+
 function validateSlug(slug) {
   return typeof slug === "string" &&
     /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug);
@@ -156,7 +221,8 @@ async function listExams(env) {
     languages,
     countriesResult,
     regionsResult,
-    categoriesResult
+    categoriesResult,
+    languageData
   ] = await Promise.all([
     env.DB.prepare(`
       SELECT
@@ -213,7 +279,8 @@ async function listExams(env) {
       SELECT id, slug, name
       FROM exam_categories
       ORDER BY name
-    `).all()
+    `).all(),
+    getExamLanguageData(env)
   ]);
 
   const translationMap = {};
@@ -231,7 +298,9 @@ async function listExams(env) {
 
   const exams = (examResult.results || []).map(exam => ({
     ...exam,
-    translations: translationMap[exam.id] || {}
+    translations: translationMap[exam.id] || {},
+    supported_languages: languageData.byExam[exam.id] || {},
+    language_coverage: languageData.byCoverage[exam.id] || {}
   }));
 
   return jsonResponse({
@@ -300,6 +369,13 @@ async function createExam(request, env) {
     }, 400);
   }
 
+  const languageSelection = parseExamLanguages(body.supported_languages, languages, defaultLanguage);
+  if (languageSelection.error) return jsonResponse({ error: languageSelection.error }, 400);
+  // New exams have no published questions. Keep all selected languages preparing.
+  if (languageSelection.rows.some(row => row.is_enabled)) {
+    return jsonResponse({ error: 'New exams have no published questions. Save languages as Preparing.' }, 400);
+  }
+
   const statements = [
     env.DB.prepare(`
       INSERT INTO exams (
@@ -344,6 +420,11 @@ async function createExam(request, env) {
         slug
       )
     ),
+
+    ...languageSelection.rows.map(row => env.DB.prepare(`
+      INSERT INTO exam_languages (exam_id, language_code, is_enabled)
+      SELECT id, ?, ? FROM exams WHERE slug = ?
+    `).bind(row.language_code, row.is_enabled, slug)),
 
     env.DB.prepare(`
       INSERT INTO admin_audit_logs (
@@ -450,6 +531,20 @@ async function updateExam(id, request, env) {
     }, 400);
   }
 
+  const languageSelection = parseExamLanguages(body.supported_languages, languages, defaultLanguage);
+  if (languageSelection.error) return jsonResponse({ error: languageSelection.error }, 400);
+  const current = await env.DB.prepare(`
+    SELECT language_code, is_enabled FROM exam_languages WHERE exam_id = ?
+  `).bind(id).all();
+  const previous = new Map((current.results || []).map(row => [row.language_code, Number(row.is_enabled)]));
+  const coverageRows = await getExamLanguageData(env);
+  for (const row of languageSelection.rows) {
+    if (row.is_enabled && previous.get(row.language_code) !== 1 &&
+        !isTranslationReady(coverageRows.byCoverage[id]?.[row.language_code], translations[row.language_code]?.title || '')) {
+      return jsonResponse({ error: `Cannot enable ${row.language_code}: title, published questions, options or topic translations are incomplete.` }, 400);
+    }
+  }
+
   const statements = [
     env.DB.prepare(`
       UPDATE exams
@@ -497,6 +592,11 @@ async function updateExam(id, request, env) {
         translations[code].description
       )
     ),
+
+    env.DB.prepare(`DELETE FROM exam_languages WHERE exam_id = ?`).bind(id),
+    ...languageSelection.rows.map(row => env.DB.prepare(`
+      INSERT INTO exam_languages (exam_id, language_code, is_enabled) VALUES (?, ?, ?)
+    `).bind(id, row.language_code, row.is_enabled)),
 
     env.DB.prepare(`
       INSERT INTO admin_audit_logs (
@@ -564,6 +664,8 @@ async function deleteExam(id, env) {
         DELETE FROM exam_translations
         WHERE exam_id = ?
       `).bind(id),
+
+      env.DB.prepare(`DELETE FROM exam_languages WHERE exam_id = ?`).bind(id),
 
       env.DB.prepare(`
         DELETE FROM exams

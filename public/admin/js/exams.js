@@ -201,7 +201,7 @@ function renderTranslationFields(translations = {}) {
           type="text"
           maxlength="200"
           value="${escapeHTML(existing.title || "")}"
-          required
+          ${language.code === "en" ? "required" : ""}
         >
 
         <label for="translation-description-${code}">Description</label>
@@ -213,6 +213,32 @@ function renderTranslationFields(translations = {}) {
       </section>
     `;
   }).join("");
+}
+
+function renderSupportedLanguages(exam = null) {
+  const container = document.getElementById('exam-supported-languages');
+  const configured = exam?.supported_languages || {};
+  const coverage = exam?.language_coverage || {};
+  const defaultCode = document.getElementById('exam-default-language').value;
+  container.innerHTML = languages.map(language => {
+    const code = language.code;
+    const existing = configured[code];
+    const selected = exam ? Boolean(existing) : code === defaultCode;
+    const enabled = Boolean(existing?.is_enabled);
+    const stats = coverage[code];
+    const counts = stats ? `Questions ${stats.question_ready}/${stats.question_total}, options ${stats.option_ready}/${stats.option_total}, topics ${stats.topic_ready}/${stats.topic_total}, title ${stats.title_ready ? 'yes' : 'no'}` : 'No existing coverage';
+    const ready = stats && Number(stats.title_ready) === 1 && Number(stats.question_total) > 0 &&
+      Number(stats.question_ready) === Number(stats.question_total) &&
+      Number(stats.option_ready) === Number(stats.option_total) &&
+      Number(stats.topic_ready) === Number(stats.topic_total);
+    return `<div class="exam-language-section" style="margin-bottom:10px">
+      <label><input type="checkbox" data-supported-language="${escapeHTML(code)}" ${selected ? 'checked' : ''}>
+        ${escapeHTML(language.native_name || language.name)} (${escapeHTML(code)})</label>
+      <label style="margin-left:16px"><input type="checkbox" data-enabled-language="${escapeHTML(code)}" ${enabled ? 'checked' : ''} ${!selected ? 'disabled' : ''}>
+        Enabled (public)</label>
+      <small style="display:block">${escapeHTML(counts)} — ${ready ? 'Ready' : 'Preparing / incomplete'}</small>
+    </div>`;
+  }).join('');
 }
 
 function openModal(exam = null) {
@@ -258,6 +284,7 @@ function openModal(exam = null) {
   );
 
   renderTranslationFields(exam?.translations || {});
+  renderSupportedLanguages(exam);
 
   document.getElementById("exam-modal-title").textContent =
     exam ? "Edit Exam" : "Add Exam";
@@ -298,7 +325,13 @@ async function saveExam(event) {
     question_count: Number(document.getElementById("exam-question-count").value),
     time_limit_minutes: timeValue === "" ? null : Number(timeValue),
     passing_score_percent: Number(document.getElementById("exam-passing-score").value),
-    translations
+    translations,
+    supported_languages: languages.filter(language =>
+      document.querySelector(`[data-supported-language="${language.code}"]`)?.checked
+    ).map(language => ({
+      language_code: language.code,
+      is_enabled: Boolean(document.querySelector(`[data-enabled-language="${language.code}"]`)?.checked)
+    }))
   };
 
   const saveButton = document.getElementById("save-exam-button");
@@ -368,6 +401,17 @@ document.getElementById("refresh-exams-button")
 document.getElementById("exam-country")
   .addEventListener("change", () => updateRegionOptions());
 
+document.getElementById('exam-supported-languages').addEventListener('change', event => {
+  if (!event.target.matches('[data-supported-language]')) return;
+  const code = event.target.dataset.supportedLanguage;
+  const enabled = document.querySelector(`[data-enabled-language="${code}"]`);
+  enabled.disabled = !event.target.checked;
+  if (!event.target.checked) enabled.checked = false;
+});
+document.getElementById('exam-default-language').addEventListener('change', event => {
+  const supported = document.querySelector(`[data-supported-language="${event.target.value}"]`);
+  if (supported) { supported.checked = true; supported.dispatchEvent(new Event('change', { bubbles: true })); }
+});
 searchInput.addEventListener("input", renderExams);
 form.addEventListener("submit", saveExam);
 
