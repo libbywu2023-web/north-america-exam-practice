@@ -25,6 +25,27 @@
     <span>Global Exam Practice</span>
   </a>
 
+  <div class="home-header-search">
+          <form class="hero-search" id="catalog-search-form" role="search">
+            <span class="search-icon" aria-hidden="true">
+  <svg viewBox="0 0 24 24" width="21" height="21" fill="none"
+       stroke="currentColor" stroke-width="2" stroke-linecap="round">
+    <circle cx="11" cy="11" r="7"></circle>
+    <path d="m16 16 4 4"></path>
+  </svg>
+</span>
+           <input
+  id="catalog-search"
+  type="search"
+  placeholder="Search for exams..."
+  aria-label="Search exams"
+  data-i18n-placeholder="searchPlaceholder"
+  data-i18n-aria="searchAria"
+  autocomplete="off"
+>
+            <button type="submit" data-i18n="searchButton">Search</button>
+          </form>
+  </div>
   <label class="language-picker">
     <span class="sr-only">Language</span>
     <select id="language">
@@ -45,28 +66,10 @@
 
   <p class="hero-description" data-i18n="heroDescription">
     Prepare for your next exam with free online practice questions.
-    Explore driving, licensing, and other exam preparation resources
+    Explore driving, citizenship, professional certification, and other exam preparation resources
     by country and region.
   </p>
-          <form class="hero-search" id="catalog-search-form" role="search">
-            <span class="search-icon" aria-hidden="true">
-  <svg viewBox="0 0 24 24" width="21" height="21" fill="none"
-       stroke="currentColor" stroke-width="2" stroke-linecap="round">
-    <circle cx="11" cy="11" r="7"></circle>
-    <path d="m16 16 4 4"></path>
-  </svg>
-</span>
-           <input
-  id="catalog-search"
-  type="search"
-  placeholder="Search for exams..."
-  aria-label="Search exams"
-  data-i18n-placeholder="searchPlaceholder"
-  data-i18n-aria="searchAria"
-  autocomplete="off"
->
-            <button type="submit" data-i18n="searchButton">Search</button>
-          </form>
+
         </div>
 
 
@@ -81,15 +84,62 @@
 
       </div>
 
-      <section class="category-browser" aria-label="Exam categories">
-        <h2 data-i18n="categoryHeading">Browse by Exam Category</h2>
-        <div id="category-filters" class="category-filters" role="group" aria-label="Filter exams by category"></div>
-      </section>
-
-      <section id="catalog" class="catalog" aria-live="polite">
-        <p class="muted">Loading exams...</p>
-      </section>
+      <div class="home-benefits" aria-label="Why practice with us">
+        <div><strong><span class="benefit-icon" aria-hidden="true">✓</span><span data-i18n="benefitFree">Free Practice Tests</span></strong><small data-i18n="benefitFreeSub">No registration required</small></div>
+        <div><strong><span class="benefit-icon" aria-hidden="true">🌐</span><span data-i18n="benefitLanguage">Multilingual Support</span></strong><small data-i18n="benefitLanguageSub">English · Français · 中文</small></div>
+        <div><strong><span class="benefit-icon" aria-hidden="true">▣</span><span data-i18n="benefitTypes">Multiple Exam Types</span></strong><small data-i18n="benefitTypesSub">Driving · Citizenship · Certification</small></div>
+        <div><strong><span class="benefit-icon" aria-hidden="true">⚡</span><span data-i18n="benefitAnytime">Study Anytime</span></strong><small data-i18n="benefitAnytimeSub">On desktop, tablet or mobile</small></div>
+      </div>
     </section>
+    <div class="home-sections">
+      <section class="category-browser" aria-labelledby="category-heading">
+        <h2 id="category-heading" class="section-heading has-icon" data-heading-icon="graduation" data-i18n="categoryHeading">Browse Free Practice Tests by Exam Category</h2>
+        <p class="section-intro" data-i18n="categoryIntro">Explore driving knowledge tests, citizenship exams, professional certifications, and other standardized exams. Choose a category to filter the available practice tests by country and region.</p>
+        <div id="category-filters" class="category-filters" role="group" aria-label="Filter exams by category">
+          <button class="category-filter" type="button" data-category="driving"><strong>Driving Tests</strong><span>Prepare for learner's permit, G1, Class 7L and CDL knowledge tests with questions on road signs, traffic rules and safe driving.</span></button>
+          <button class="category-filter" type="button" data-category="immigration-citizenship"><strong>Immigration &amp; Citizenship</strong><span>Study citizenship knowledge topics such as history, government, civic rights and responsibilities.</span></button>
+          <button class="category-filter" type="button" data-category="professional-certification"><strong>Professional Certification</strong><span>Explore licensing, workplace safety and career certification exam preparation.</span></button>
+          <button class="category-filter" type="button" data-category="other"><strong>Other Exams</strong><span>Find food safety, health-related and other knowledge-based exam resources.</span></button>
+        </div>
+        <button id="show-all-exams" class="home-show-all" type="button" data-i18n="showAll">Show all exam categories</button>
+      </section>
+      <section class="country-browser" aria-labelledby="country-heading">
+        <h2 id="country-heading" class="section-heading has-icon" data-heading-icon="globe" data-i18n="countryHeading">Explore Practice Tests by Country</h2>
+        <p class="section-intro" data-i18n="countryIntro">Find free practice tests organized by country, province and state. Select an exam to start preparing.</p>
+        <div id="catalog-filter-status" class="catalog-filter-status" role="status" aria-live="polite" hidden>
+          <div class="catalog-filter-summary">
+            <span id="catalog-filter-prefix" class="catalog-filter-prefix">Showing:</span>
+            <span id="catalog-filter-name" class="catalog-filter-pill"></span>
+            <span id="catalog-filter-count" class="catalog-filter-count"></span>
+          </div>
+          <button id="catalog-clear-filter" class="catalog-clear-filter" type="button">Clear filter</button>
+        </div>
+        <div id="catalog" class="catalog" aria-live="polite"><p class="muted">Loading exams...</p></div>
+      </section>
+      <section class="popular-section" aria-labelledby="popular-heading">
+        <h2 id="popular-heading" class="section-heading has-icon" data-heading-icon="star" data-i18n="popularHeading">Popular Practice Tests</h2>
+        <p class="section-intro" data-i18n="popularIntro">Start with a published practice test and review questions at your own pace.</p>
+        <div id="popular-exams" class="popular-grid"></div>
+      </section>
+      <section class="preparation-section" aria-labelledby="preparation-heading">
+        <h2 id="preparation-heading" class="section-heading has-icon" data-heading-icon="book" data-i18n="preparationHeading">How to Prepare for Your Exam</h2>
+        <div class="prep-grid">
+          <article><span class="prep-icon" data-prep-icon="target" aria-hidden="true"></span><h3 data-i18n="prep1Title">Know the Exam Format</h3><p data-i18n="prep1Text">Check the official exam format, time limit, passing score and topics before you begin studying.</p></article>
+          <article><span class="prep-icon" data-prep-icon="file" aria-hidden="true"></span><h3 data-i18n="prep2Title">Practice with Questions</h3><p data-i18n="prep2Text">Use online practice questions to become familiar with the subject matter and test-style questions.</p></article>
+          <article><span class="prep-icon" data-prep-icon="chart" aria-hidden="true"></span><h3 data-i18n="prep3Title">Review and Improve</h3><p data-i18n="prep3Text">Review answers and explanations, identify weak areas and repeat practice as needed.</p></article>
+        </div>
+      </section>
+      <section class="home-faq" aria-labelledby="faq-heading">
+        <h2 id="faq-heading" class="section-heading has-icon" data-heading-icon="help" data-i18n="faqHeading">Frequently Asked Questions</h2>
+        <div class="faq-list">
+          <details><summary data-i18n="faq1q">Are the practice tests free?</summary><p data-i18n="faq1a">Yes. You can access the available online practice questions for free.</p></details>
+          <details><summary data-i18n="faq2q">Do I need to create an account?</summary><p data-i18n="faq2a">No account is required to start using the available practice tests.</p></details>
+          <details><summary data-i18n="faq3q">Are these official exam questions?</summary><p data-i18n="faq3a">No. These are independent study resources, not official examination questions. Always consult the relevant official exam authority for current requirements.</p></details>
+          <details><summary data-i18n="faq4q">Which exams can I practice?</summary><p data-i18n="faq4a">Browse the country directory above for currently available driving and citizenship practice tests. More exam categories will be added.</p></details>
+          <details><summary data-i18n="faq5q">Which languages are supported?</summary><p data-i18n="faq5a">The website supports English, French, Simplified Chinese and Traditional Chinese. Available languages can vary by exam.</p></details>
+        </div>
+      </section>
+    </div>
   </main>
 
   <script type="module" src="/js/app.js"></script>
