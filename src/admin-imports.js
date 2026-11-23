@@ -102,7 +102,7 @@ async function translateInChunks(texts, language, env) {
 }
 
 async function translateRecords(records, env, errors, enabledLanguages) {
-  for (const language of ["zh-CN", "zh-TW"]) {
+  for (const language of ["zh-CN", "zh-TW", "fr"]) {
     if (!enabledLanguages.has(language)) continue;
     const tasks = [];
 
@@ -207,12 +207,14 @@ function normalizeQuestion(row, index) {
       "zh-TW": {
         text: clean(row.questionZhTw),
         source: "manual"
-      }
+      },
+      fr: { text: clean(row.questionFr), source: "manual" }
     },
     explanationTranslations: {
       en: clean(row.explanationEn),
       "zh-CN": clean(row.explanationZhCn),
-      "zh-TW": clean(row.explanationZhTw)
+      "zh-TW": clean(row.explanationZhTw),
+      fr: clean(row.explanationFr)
     },
     options: []
   };
@@ -237,7 +239,8 @@ function normalizeOption(row, index) {
       "zh-TW": {
         text: clean(row.optionZhTw),
         source: "manual"
-      }
+      },
+      fr: { text: clean(row.optionFr), source: "manual" }
     }
   };
 }
@@ -562,6 +565,13 @@ async function importQuestions(request, env) {
         option.translations["zh-TW"] = { text: "", source: "machine" };
       }
     }
+
+    if (!enabledLanguages.has("fr")) {
+      record.questionTranslations.fr = { text: "", source: "machine" };
+      for (const option of record.options) {
+        option.translations.fr = { text: "", source: "machine" };
+      }
+    }
   }
 
   await translateRecords(
@@ -618,7 +628,7 @@ async function importQuestions(request, env) {
 
         const questionTranslationStatements = [];
 
-        for (const language of ["en", "zh-CN", "zh-TW"]) {
+        for (const language of ["en", "zh-CN", "zh-TW", "fr"]) {
           if (!enabledLanguages.has(language)) continue;
 
           const translation = record.questionTranslations[language];
@@ -666,7 +676,7 @@ async function importQuestions(request, env) {
           const stagingOptionId = optionResult.meta.last_row_id;
           const optionTranslationStatements = [];
 
-          for (const language of ["en", "zh-CN", "zh-TW"]) {
+          for (const language of ["en", "zh-CN", "zh-TW", "fr"]) {
             if (!enabledLanguages.has(language)) continue;
 
             const translation = option.translations[language];
