@@ -19,7 +19,9 @@ const QUESTION_COLUMNS = [
   "question_zh_cn",
   "explanation_zh_cn",
   "question_zh_tw",
-  "explanation_zh_tw"
+  "explanation_zh_tw",
+  "question_fr",
+  "explanation_fr"
 ];
 
 const OPTION_COLUMNS = [
@@ -29,7 +31,8 @@ const OPTION_COLUMNS = [
   "is_correct",
   "option_en",
   "option_zh_cn",
-  "option_zh_tw"
+  "option_zh_tw",
+  "option_fr"
 ];
 
 function showMessage(element, message, type = "") {
@@ -109,6 +112,7 @@ document.getElementById("download-template")
   .addEventListener("click", downloadTemplate);
 
 function readSheet(workbook, sheetName, requiredColumns) {
+  const optionalColumns = ["question_fr", "explanation_fr", "option_fr"];
   const sheet = workbook.Sheets[sheetName];
 
   if (!sheet) {
@@ -131,7 +135,7 @@ function readSheet(workbook, sheetName, requiredColumns) {
   );
 
   const missing = requiredColumns.filter(
-    (column) => !headers.includes(column)
+    (column) => !headers.includes(column) && !optionalColumns.includes(column)
   );
 
   if (missing.length) {
@@ -157,7 +161,7 @@ function readSheet(workbook, sheetName, requiredColumns) {
     const record = { rowNumber: i + 1 };
 
     for (const column of requiredColumns) {
-      record[column] = row[columnIndexes[column]] ?? "";
+      record[column] = headers.includes(column) ? (row[columnIndexes[column]] ?? "") : "";
     }
 
     records.push(record);
@@ -178,7 +182,9 @@ function mapQuestion(row) {
     questionZhCn: row.question_zh_cn,
     explanationZhCn: row.explanation_zh_cn,
     questionZhTw: row.question_zh_tw,
-    explanationZhTw: row.explanation_zh_tw
+    explanationZhTw: row.explanation_zh_tw,
+    questionFr: row.question_fr,
+    explanationFr: row.explanation_fr
   };
 }
 
@@ -191,7 +197,8 @@ function mapOption(row) {
     isCorrect: row.is_correct,
     optionEn: row.option_en,
     optionZhCn: row.option_zh_cn,
-    optionZhTw: row.option_zh_tw
+    optionZhTw: row.option_zh_tw,
+    optionFr: row.option_fr
   };
 }
 
