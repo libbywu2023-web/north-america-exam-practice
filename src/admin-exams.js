@@ -25,33 +25,72 @@ async function getEnabledLanguages(env) {
   return result.results || [];
 }
 
-async function getExamLanguageData(env) {
+async function getExamLanguageData(env, examId = null) {
   const [configured, coverage] = await Promise.all([
-    env.DB.prepare(`SELECT exam_id, language_code, is_enabled FROM exam_languages`).all(),
+    env.DB.prepare(`SELECT exam_id, language_code, is_enabled FROM exam_languages${examId === null ? '' : ' WHERE exam_id = ?'}`)
+      .bind(...(examId === null ? [] : [examId])).all(),
     env.DB.prepare(`
+      WITH published_questions AS (
+        SELECT id, exam_id, topic_id FROM questions WHERE status = 'published'
+          ${examId === null ? '' : 'AND exam_id = ?'}
+      ),
+      question_totals AS (
+        SELECT exam_id, COUNT(*) AS question_total
+        FROM published_questions GROUP BY exam_id
+      ),
+      question_ready AS (
+        SELECT q.exam_id, qt.language_code, COUNT(*) AS question_ready
+        FROM published_questions q
+        JOIN question_translations qt ON qt.question_id = q.id
+        WHERE TRIM(qt.question_text) <> ''
+        GROUP BY q.exam_id, qt.language_code
+      ),
+      option_totals AS (
+        SELECT q.exam_id, COUNT(*) AS option_total
+        FROM published_questions q JOIN question_options o ON o.question_id = q.id
+        GROUP BY q.exam_id
+      ),
+      option_ready AS (
+        SELECT q.exam_id, ot.language_code, COUNT(*) AS option_ready
+        FROM published_questions q
+        JOIN question_options o ON o.question_id = q.id
+        JOIN option_translations ot ON ot.option_id = o.id
+        WHERE TRIM(ot.option_text) <> ''
+        GROUP BY q.exam_id, ot.language_code
+      ),
+      used_topics AS (
+        SELECT DISTINCT exam_id, topic_id FROM published_questions WHERE topic_id IS NOT NULL
+      ),
+      topic_totals AS (
+        SELECT u.exam_id, COUNT(*) AS topic_total
+        FROM used_topics u JOIN topics t ON t.id = u.topic_id
+        GROUP BY u.exam_id
+      ),
+      topic_ready AS (
+        SELECT u.exam_id, tt.language_code, COUNT(*) AS topic_ready
+        FROM used_topics u JOIN topics t ON t.id = u.topic_id
+        JOIN topic_translations tt ON tt.topic_id = t.id
+        WHERE TRIM(tt.name) <> ''
+        GROUP BY u.exam_id, tt.language_code
+      )
       SELECT e.id AS exam_id, l.code AS language_code,
         CASE WHEN et.title IS NOT NULL AND TRIM(et.title) <> '' THEN 1 ELSE 0 END AS title_ready,
-        (SELECT COUNT(*) FROM questions q WHERE q.exam_id = e.id AND q.status = 'published') AS question_total,
-        (SELECT COUNT(*) FROM questions q JOIN question_translations qt ON qt.question_id = q.id
-         WHERE q.exam_id = e.id AND q.status = 'published' AND qt.language_code = l.code
-           AND TRIM(qt.question_text) <> '') AS question_ready,
-        (SELECT COUNT(*) FROM question_options o JOIN questions q ON q.id = o.question_id
-         WHERE q.exam_id = e.id AND q.status = 'published') AS option_total,
-        (SELECT COUNT(*) FROM question_options o JOIN questions q ON q.id = o.question_id
-         JOIN option_translations ot ON ot.option_id = o.id
-         WHERE q.exam_id = e.id AND q.status = 'published' AND ot.language_code = l.code
-           AND TRIM(ot.option_text) <> '') AS option_ready,
-        (SELECT COUNT(DISTINCT t.id) FROM topics t JOIN questions q ON q.topic_id = t.id
-         WHERE q.exam_id = e.id AND q.status = 'published') AS topic_total,
-        (SELECT COUNT(DISTINCT t.id) FROM topics t JOIN questions q ON q.topic_id = t.id
-         JOIN topic_translations tt ON tt.topic_id = t.id
-         WHERE q.exam_id = e.id AND q.status = 'published' AND tt.language_code = l.code
-           AND TRIM(tt.name) <> '') AS topic_ready
+        COALESCE(qt.question_total, 0) AS question_total,
+        COALESCE(qr.question_ready, 0) AS question_ready,
+        COALESCE(ot.option_total, 0) AS option_total,
+        COALESCE(orr.option_ready, 0) AS option_ready,
+        COALESCE(tt.topic_total, 0) AS topic_total,
+        COALESCE(tr.topic_ready, 0) AS topic_ready
       FROM exams e CROSS JOIN languages l
-      LEFT JOIN exam_translations et
-        ON et.exam_id = e.id AND et.language_code = l.code
-      WHERE l.is_enabled = 1
-    `).all()
+      LEFT JOIN exam_translations et ON et.exam_id = e.id AND et.language_code = l.code
+      LEFT JOIN question_totals qt ON qt.exam_id = e.id
+      LEFT JOIN question_ready qr ON qr.exam_id = e.id AND qr.language_code = l.code
+      LEFT JOIN option_totals ot ON ot.exam_id = e.id
+      LEFT JOIN option_ready orr ON orr.exam_id = e.id AND orr.language_code = l.code
+      LEFT JOIN topic_totals tt ON tt.exam_id = e.id
+      LEFT JOIN topic_ready tr ON tr.exam_id = e.id AND tr.language_code = l.code
+      WHERE l.is_enabled = 1${examId === null ? '' : ' AND e.id = ?'}
+    `).bind(...(examId === null ? [] : [examId, examId])).all()
   ]);
   const byExam = {};
   for (const row of configured.results || []) {
@@ -702,11 +741,17 @@ async function updateExam(id, request, env) {
     SELECT language_code, is_enabled FROM exam_languages WHERE exam_id = ?
   `).bind(id).all();
   const previous = new Map((current.results || []).map(row => [row.language_code, Number(row.is_enabled)]));
-  const coverageRows = await getExamLanguageData(env);
-  for (const row of languageSelection.rows) {
-    if (row.is_enabled && previous.get(row.language_code) !== 1 &&
-        !isTranslationReady(coverageRows.byCoverage[id]?.[row.language_code], translations[row.language_code]?.title || '')) {
-      return jsonResponse({ error: `Cannot enable ${row.language_code}: title, published questions, options or topic translations are incomplete.` }, 400);
+  // Editing metadata or an already-public language does not require scanning
+  // translation coverage. Only newly enabled languages need this validation.
+  const newlyEnabled = languageSelection.rows.filter(row =>
+    row.is_enabled && previous.get(row.language_code) !== 1
+  );
+  if (newlyEnabled.length) {
+    const coverageRows = await getExamLanguageData(env, id);
+    for (const row of newlyEnabled) {
+      if (!isTranslationReady(coverageRows.byCoverage[id]?.[row.language_code], translations[row.language_code]?.title || '')) {
+        return jsonResponse({ error: `Cannot enable ${row.language_code}: title, published questions, options or topic translations are incomplete.` }, 400);
+      }
     }
   }
 
