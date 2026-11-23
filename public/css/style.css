@@ -1696,3 +1696,12 @@ body:has(.practice-page-head) .practice-bottom-actions button:disabled { opacity
 .homepage .category-filter[aria-pressed="true"] { background: #1769c2; color: #fff; border-color: #1769c2; }
 .homepage .category-filter:focus-visible { outline: 3px solid #f0a323; outline-offset: 2px; }
 @media(max-width: 600px) { .homepage .category-browser { margin: 16px auto; } .homepage .category-filter { padding: 10px 12px; font-size: 13px; } }
+
+/* Analytics consent controls (public pages only) */
+.examhere-cookie-settings{position:fixed;bottom:12px;left:12px;z-index:10000;padding:6px 10px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;color:#334155;font:12px/1.4 system-ui,sans-serif;cursor:pointer;box-shadow:0 2px 8px #0002}
+.examhere-cookie-banner{position:fixed;bottom:50px;left:12px;right:12px;max-width:620px;z-index:10001;background:#fff;color:#1e293b;border:1px solid #cbd5e1;border-radius:10px;padding:16px;box-shadow:0 6px 28px #0003;font:14px/1.5 system-ui,sans-serif}
+.examhere-cookie-banner[hidden]{display:none!important}
+.examhere-cookie-banner p{margin:0 0 12px}
+.examhere-cookie-actions{display:flex;gap:10px;flex-wrap:wrap}
+.examhere-cookie-actions button{padding:8px 14px;border:1px solid #2563eb;border-radius:6px;background:#fff;color:#1d4ed8;cursor:pointer}
+.examhere-cookie-actions button:last-child{background:#2563eb;color:#fff}
