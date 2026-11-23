@@ -1705,3 +1705,10 @@ body:has(.practice-page-head) .practice-bottom-actions button:disabled { opacity
 .examhere-cookie-actions{display:flex;gap:10px;flex-wrap:wrap}
 .examhere-cookie-actions button{padding:8px 14px;border:1px solid #2563eb;border-radius:6px;background:#fff;color:#1d4ed8;cursor:pointer}
 .examhere-cookie-actions button:last-child{background:#2563eb;color:#fff}
+
+/* Server-rendered exam introduction: visible to visitors and crawlers. */
+.practice-heading-copy .practice-seo-description {
+  margin: 8px 0 0; color: #475569; font-size: 15px; line-height: 1.65;
+  max-width: 76ch; white-space: pre-line;
+}
+.practice-heading-copy .practice-seo-description[hidden] { display: none !important; }
