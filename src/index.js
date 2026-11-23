@@ -668,10 +668,63 @@ async function api(request, env) {
   return json({ error: "API route not found." }, 404);
 }
 
+// Public sitemap: only published exams with enabled languages and a real title.
+const SITEMAP_ORIGIN = "https://examhere.com";
+const SITEMAP_LANGS = [
+  { code: "en", prefix: "" },
+  { code: "fr", prefix: "/fr" },
+  { code: "zh-CN", prefix: "/zh" },
+  { code: "zh-TW", prefix: "/zh-tw" }
+];
+
+function xmlEscape(value) {
+  return String(value).replace(/[&<>"']/g, char => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;",
+    '"': "&quot;", "'": "&apos;"
+  })[char]);
+}
+
+async function sitemapResponse(db) {
+  const result = await db.prepare(`
+    SELECT e.slug, el.language_code
+    FROM exams e
+    JOIN exam_languages el ON el.exam_id = e.id AND el.is_enabled = 1
+    JOIN languages l ON l.code = el.language_code AND l.is_enabled = 1
+    JOIN exam_translations et ON et.exam_id = e.id
+      AND et.language_code = el.language_code
+      AND TRIM(et.title) <> ''
+    WHERE e.status = 'published'
+    ORDER BY e.slug, el.language_code
+  `).all();
+
+  const urls = SITEMAP_LANGS.map(lang => `${SITEMAP_ORIGIN}${lang.prefix || "/"}`);
+  for (const row of result.results || []) {
+    const lang = SITEMAP_LANGS.find(item => item.code === row.language_code);
+    if (lang && /^[a-z0-9-]+$/.test(row.slug)) {
+      urls.push(`${SITEMAP_ORIGIN}${lang.prefix}/${row.slug}`);
+    }
+  }
+  const unique = [...new Set(urls)];
+  const xml = '<?xml version="1.0" encoding="UTF-8"?>\n' +
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' +
+    unique.map(url => `  <url><loc>${xmlEscape(url)}</loc></url>`).join('\n') +
+    '\n</urlset>\n';
+  return new Response(xml, {
+    headers: {
+      "content-type": "application/xml; charset=utf-8",
+      "cache-control": "public, max-age=300"
+    }
+  });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     try {
+      if (request.method === "GET" && url.pathname === "/sitemap.xml") {
+        if (!env.DB) return new Response("Database unavailable", { status: 503 });
+        return sitemapResponse(env.DB);
+      }
       // Country-level routing for analytics consent; no IP or identifiers returned.
       if (request.method === "GET" && url.pathname === "/api/privacy-region") {
         const country = request.cf?.country || "";
