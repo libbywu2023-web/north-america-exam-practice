@@ -750,7 +750,7 @@ function seoHead({ lang, title, description, canonical, alternates }) {
   ];
   return { links: links.join("\n"), title: seoEscape(title), description: seoEscape(description), lang };
 }
-async function seoHtmlResponse(response, metadata, examTitle = "") {
+async function seoHtmlResponse(response, metadata, examTitle = "", examDescription = "") {
   if (!response.ok) return response;
   const type = response.headers.get("content-type") || "";
   if (!type.includes("text/html")) return response;
@@ -769,8 +769,12 @@ async function seoHtmlResponse(response, metadata, examTitle = "") {
 <meta property="og:url" content="${seoEscape(metadata.canonical)}">
 </head>`);
   if (examTitle) {
-    html = html.replace('<h2 id="practice-exam-title" class="practice-exam-title" hidden></h2>',
-      `<h2 id="practice-exam-title" class="practice-exam-title">${seoEscape(examTitle)}</h2>`);
+    html = html.replace('<h1 id="practice-exam-title" class="practice-exam-title" hidden></h1>',
+      `<h1 id="practice-exam-title" class="practice-exam-title">${seoEscape(examTitle)}</h1>`);
+    if (examDescription && String(examDescription).trim()) {
+      html = html.replace('<p id="practice-seo-description" class="practice-seo-description" hidden></p>',
+        `<p id="practice-seo-description" class="practice-seo-description">${seoEscape(examDescription)}</p>`);
+    }
   }
   const headers = new Headers(response.headers);
   headers.delete("content-length");
@@ -963,7 +967,7 @@ export default {
             metadata.canonical = canonical;
             return seoHtmlResponse(
               await env.ASSETS.fetch(new Request(assetUrl.toString(), request)),
-              metadata, exam.title
+              metadata, exam.title, exam.description
             );
           }
         }
