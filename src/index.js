@@ -717,6 +717,83 @@ async function sitemapResponse(db) {
   });
 }
 
+
+// Render SEO metadata in the initial HTML response, before browser JavaScript runs.
+const SEO_ORIGIN = "https://examhere.com";
+const SEO_LANGS = [
+  { code: "en", prefix: "", hreflang: "en" },
+  { code: "fr", prefix: "/fr", hreflang: "fr" },
+  { code: "zh-CN", prefix: "/zh", hreflang: "zh-CN" },
+  { code: "zh-TW", prefix: "/zh-tw", hreflang: "zh-TW" }
+];
+const SEO_HOME = {
+  en: ["Global Exam Practice - Free Online Practice Tests", "Free online practice tests for exams worldwide. Find driving, citizenship and other exam preparation resources."],
+  fr: ["Global Exam Practice - Tests pratiques gratuits", "Préparez vos examens avec des questions gratuites en ligne, notamment pour la conduite et la citoyenneté."],
+  "zh-CN": ["Global Exam Practice - 全球免费在线考试练习", "提供全球驾照、入籍及其他考试的免费在线练习题，按国家和地区查找备考资源。"],
+  "zh-TW": ["Global Exam Practice - 全球免費線上考試練習", "提供全球駕照、入籍及其他考試的免費線上練習題，依國家和地區查找備考資源。"]
+};
+function seoEscape(value) {
+  return String(value ?? "").replace(/[&<>"']/g, ch => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  })[ch]);
+}
+function seoPath(code, slug = "") {
+  const entry = SEO_LANGS.find(lang => lang.code === code);
+  return `${entry?.prefix || ""}/${slug}` || "/";
+}
+function seoHead({ lang, title, description, canonical, alternates }) {
+  const links = [
+    `<link id="canonical-url" rel="canonical" href="${seoEscape(canonical)}">`,
+    ...alternates.map(item =>
+      `<link rel="alternate" hreflang="${seoEscape(item.code)}" href="${seoEscape(item.url)}">`
+    )
+  ];
+  return { links: links.join("\n"), title: seoEscape(title), description: seoEscape(description), lang };
+}
+async function seoHtmlResponse(response, metadata, examTitle = "") {
+  if (!response.ok) return response;
+  const type = response.headers.get("content-type") || "";
+  if (!type.includes("text/html")) return response;
+  let html = await response.text();
+  html = html.replace(/<html lang="[^"]*">/, `<html lang="${seoEscape(metadata.lang)}">`);
+  html = html.replace(/<title>[\s\S]*?<\/title>/i, `<title>${metadata.title}</title>`);
+  html = html.replace(/<meta name="description" content="[^"]*">/i,
+    `<meta name="description" content="${metadata.description}">`);
+  html = html.replace(/<link id="canonical-url" rel="canonical" href="[^"]*">/i, "");
+  html = html.replace(/<meta property="og:url" content="[^"]*">/i, "");
+  html = html.replace(/<meta property="og:title" content="[^"]*">/i, "");
+  html = html.replace(/<meta property="og:description" content="[^"]*">/i, "");
+  html = html.replace("</head>", `${metadata.links}
+<meta property="og:title" content="${metadata.title}">
+<meta property="og:description" content="${metadata.description}">
+<meta property="og:url" content="${seoEscape(metadata.canonical)}">
+</head>`);
+  if (examTitle) {
+    html = html.replace('<h2 id="practice-exam-title" class="practice-exam-title" hidden></h2>',
+      `<h2 id="practice-exam-title" class="practice-exam-title">${seoEscape(examTitle)}</h2>`);
+  }
+  const headers = new Headers(response.headers);
+  headers.delete("content-length");
+  headers.set("content-type", "text/html; charset=utf-8");
+  headers.set("cache-control", "public, max-age=300");
+  return new Response(html, { status: response.status, headers });
+}
+async function seoExamAlternates(db, examId, slug) {
+  const result = await db.prepare(`
+    SELECT el.language_code FROM exam_languages el
+    JOIN languages l ON l.code = el.language_code AND l.is_enabled = 1
+    JOIN exam_translations et ON et.exam_id = el.exam_id
+      AND et.language_code = el.language_code AND TRIM(et.title) <> ''
+    WHERE el.exam_id = ? AND el.is_enabled = 1
+  `).bind(examId).all();
+  return (result.results || []).filter(row =>
+    SEO_LANGS.some(lang => lang.code === row.language_code)
+  ).map(row => ({
+    code: row.language_code,
+    url: SEO_ORIGIN + seoPath(row.language_code, slug)
+  }));
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -808,8 +885,20 @@ export default {
         const assetUrl = new URL(request.url);
         assetUrl.pathname = "/";
 
-        return env.ASSETS.fetch(
-          new Request(assetUrl.toString(), request)
+        const lang = url.pathname.startsWith("/fr") ? "fr" :
+          url.pathname.startsWith("/zh-tw") ? "zh-TW" : "zh-CN";
+        const [title, description] = SEO_HOME[lang];
+        const metadata = seoHead({
+          lang, title, description,
+          canonical: SEO_ORIGIN + seoPath(lang),
+          alternates: SEO_LANGS.map(item => ({
+            code: item.hreflang, url: SEO_ORIGIN + seoPath(item.code)
+          }))
+        });
+        metadata.canonical = SEO_ORIGIN + seoPath(lang);
+        return seoHtmlResponse(
+          await env.ASSETS.fetch(new Request(assetUrl.toString(), request)),
+          metadata
         );
       }
 
@@ -862,13 +951,35 @@ export default {
             const assetUrl = new URL(request.url);
             assetUrl.pathname = "/practice";
 
-            return env.ASSETS.fetch(
-              new Request(assetUrl.toString(), request)
+            const alternates = await seoExamAlternates(env.DB, exam.id, examSlug);
+            const canonical = SEO_ORIGIN + seoPath(routeLang, examSlug);
+            const metadata = seoHead({
+              lang: routeLang,
+              title: `${exam.title} | Exam Practice`,
+              description: exam.description || `${exam.title} practice questions on Exam Practice.`,
+              canonical,
+              alternates: alternates.map(item => ({ ...item, code: item.code }))
+            });
+            metadata.canonical = canonical;
+            return seoHtmlResponse(
+              await env.ASSETS.fetch(new Request(assetUrl.toString(), request)),
+              metadata, exam.title
             );
           }
         }
       }
 
+      if (request.method === "GET" && url.pathname === "/") {
+        const [title, description] = SEO_HOME.en;
+        const metadata = seoHead({
+          lang: "en", title, description, canonical: SEO_ORIGIN + "/",
+          alternates: SEO_LANGS.map(item => ({
+            code: item.hreflang, url: SEO_ORIGIN + seoPath(item.code)
+          }))
+        });
+        metadata.canonical = SEO_ORIGIN + "/";
+        return seoHtmlResponse(await env.ASSETS.fetch(request), metadata);
+      }
       return env.ASSETS.fetch(request);
     } catch (error) {
       console.error("Request failed", error);
