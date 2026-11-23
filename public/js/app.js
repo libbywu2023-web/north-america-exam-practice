@@ -233,11 +233,17 @@ const labels = {
   }
 };
 
-const countryFlags = {
-  CA: "🇨🇦",
-  US: "🇺🇸",
-  MX: "🇲🇽"
-};
+function getCountryFlag(countryCode) {
+  let code = String(countryCode || "").trim().toUpperCase();
+
+  if (code === "UK") code = "GB";
+
+  if (!/^[A-Z]{2}$/.test(code)) return "🌎";
+
+  return String.fromCodePoint(
+    ...Array.from(code, char => 127397 + char.charCodeAt(0))
+  );
+}
 
 let allExams = [];
 let activeCategory = "all";
@@ -471,7 +477,7 @@ function renderCatalog(query = "") {
     const section = createElement("section", "catalog-country");
 
     const heading = createElement("h2", "catalog-country-title");
-    const flag = countryFlags[country.code] || "🌎";
+    const flag = getCountryFlag(country.code);
 
     heading.textContent = `${flag} ${country.name}`;
     section.append(heading);
