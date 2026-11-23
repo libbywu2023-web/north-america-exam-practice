@@ -672,6 +672,20 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     try {
+      // Country-level routing for analytics consent; no IP or identifiers returned.
+      if (request.method === "GET" && url.pathname === "/api/privacy-region") {
+        const country = request.cf?.country || "";
+        const consentCountries = new Set([
+          "AT","BE","BG","HR","CY","CZ","DK","EE","FI","FR","DE","GR",
+          "HU","IE","IT","LV","LT","LU","MT","NL","PL","PT","RO","SK",
+          "SI","ES","SE","IS","LI","NO","GB","CH"
+        ]);
+        const region = !country || country === "XX" || country === "T1"
+          ? "unknown" : consentCountries.has(country) ? "opt-in" : "notice";
+        return new Response(JSON.stringify({ region }), {
+          headers: { "content-type": "application/json; charset=utf-8", "cache-control": "private, no-store" }
+        });
+      }
       if (url.pathname.startsWith("/api/admin/languages")) {
         return await handleAdminLanguages(request, env);
       }
