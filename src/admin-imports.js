@@ -313,7 +313,7 @@ async function importQuestions(request, env) {
   const enabledLanguagesResult = await db.prepare(`
     SELECT l.code
     FROM languages l JOIN exam_languages el ON el.language_code = l.code
-    WHERE l.is_enabled = 1 AND el.is_enabled = 1 AND el.exam_id = ?
+    WHERE l.is_enabled = 1 AND el.exam_id = ?
   `).bind(exam.id).all();
 
   const enabledLanguages = new Set(
@@ -322,7 +322,7 @@ async function importQuestions(request, env) {
 
   if (!enabledLanguages.has("en")) {
     return json({
-      error: "English must be enabled globally and for this exam before importing."
+      error: "English must be enabled globally and configured for this exam before importing."
     }, 400);
   }
 

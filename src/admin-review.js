@@ -32,7 +32,7 @@ async function suppliedLanguages(db, id, enabled) {
   const scope = await db.prepare(`SELECT el.language_code FROM exam_languages el
     JOIN import_batches ib ON ib.exam_id = el.exam_id
     JOIN questions_staging qs ON qs.batch_id = ib.id
-    WHERE qs.id = ? AND el.is_enabled = 1 AND EXISTS (SELECT 1 FROM exam_languages el WHERE el.exam_id = e.id AND el.language_code = l.code AND el.is_enabled = 1)`).bind(id).all();
+    WHERE qs.id = ?`).bind(id).all();
   const allowed = new Set((scope.results || []).map(row => row.language_code));
   return enabled.filter(code => allowed.has(code) && (code === 'en' || supplied.has(code)));
 }
@@ -100,7 +100,7 @@ async function listReviewQuestions(request, env) {
       CASE WHEN NOT EXISTS (
         SELECT 1
         FROM languages l
-        WHERE l.is_enabled = 1
+        WHERE l.is_enabled = 1 AND EXISTS (SELECT 1 FROM exam_languages el WHERE el.exam_id = e.id AND el.language_code = l.code)
           AND (l.code = 'en' OR EXISTS (
             SELECT 1 FROM question_translations_staging qx WHERE qx.staging_question_id = qs.id AND qx.language_code = l.code AND (TRIM(qx.question_text) <> '' OR TRIM(COALESCE(qx.explanation, '')) <> '')
           ) OR EXISTS (
@@ -134,7 +134,7 @@ async function listReviewQuestions(request, env) {
           FROM question_translations_staging qt3
           JOIN languages l3 ON l3.code = qt3.language_code
           WHERE qt3.staging_question_id = qs.id
-            AND l3.is_enabled = 1 AND EXISTS (SELECT 1 FROM exam_languages el WHERE el.exam_id = e.id AND el.language_code = l3.code AND el.is_enabled = 1)
+            AND l3.is_enabled = 1 AND EXISTS (SELECT 1 FROM exam_languages el WHERE el.exam_id = e.id AND el.language_code = l3.code)
             AND TRIM(qt3.question_text) <> '' AND qt3.translation_source = 'machine'
         )
         OR EXISTS (
@@ -144,7 +144,7 @@ async function listReviewQuestions(request, env) {
             ON ot3.staging_option_id = qos3.id
           JOIN languages l4 ON l4.code = ot3.language_code
           WHERE qos3.staging_question_id = qs.id
-            AND l4.is_enabled = 1 AND EXISTS (SELECT 1 FROM exam_languages el WHERE el.exam_id = e.id AND el.language_code = l4.code AND el.is_enabled = 1)
+            AND l4.is_enabled = 1 AND EXISTS (SELECT 1 FROM exam_languages el WHERE el.exam_id = e.id AND el.language_code = l4.code)
             AND TRIM(ot3.option_text) <> '' AND ot3.translation_source = 'machine'
         )
       THEN 1 ELSE 0 END AS translation_has_machine,
@@ -152,7 +152,7 @@ async function listReviewQuestions(request, env) {
         NOT EXISTS (
           SELECT 1
           FROM languages l5
-          WHERE l5.is_enabled = 1 AND EXISTS (SELECT 1 FROM exam_languages el WHERE el.exam_id = e.id AND el.language_code = l5.code AND el.is_enabled = 1)
+          WHERE l5.is_enabled = 1 AND EXISTS (SELECT 1 FROM exam_languages el WHERE el.exam_id = e.id AND el.language_code = l5.code)
           AND (l5.code = 'en' OR EXISTS (
             SELECT 1 FROM question_translations_staging qx WHERE qx.staging_question_id = qs.id AND qx.language_code = l5.code AND (TRIM(qx.question_text) <> '' OR TRIM(COALESCE(qx.explanation, '')) <> '')
           ) OR EXISTS (
@@ -288,7 +288,7 @@ async function getReviewQuestion(env, id) {
 
       env.DB.prepare(`
         SELECT l.code FROM languages l JOIN exam_languages el ON el.language_code = l.code
-        WHERE l.is_enabled = 1 AND el.is_enabled = 1 AND el.exam_id = ?
+        WHERE l.is_enabled = 1 AND el.exam_id = ?
         ORDER BY l.sort_order, l.code
       `).bind(question.exam_id).all()
     ]);
@@ -392,7 +392,7 @@ async function saveReviewQuestion(request, env, id) {
 
   const enabledLanguagesResult = await env.DB.prepare(`
     SELECT l.code FROM languages l JOIN exam_languages el ON el.language_code = l.code
-    WHERE l.is_enabled = 1 AND el.is_enabled = 1 AND el.exam_id = ?
+    WHERE l.is_enabled = 1 AND el.exam_id = ?
   `).bind(existing.exam_id).all();
 
   const languages = (enabledLanguagesResult.results || [])
