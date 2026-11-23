@@ -1033,7 +1033,48 @@ async function deleteQuestion(id, env) {
   }
 
   try {
+    // Collect image references before deleting database records.
+    const imageResult = await env.DB.prepare(`
+      SELECT image_url
+      FROM question_images
+      WHERE question_id = ?
+
+      UNION
+
+      SELECT '/images/' || sqi.r2_key AS image_url
+      FROM staging_question_images sqi
+      JOIN questions_staging qs
+        ON qs.id = sqi.staging_question_id
+      WHERE qs.published_question_id = ?
+    `).bind(id, id).all();
+
+    const imageKeys = [...new Set(
+      (imageResult.results || [])
+        .map(row => row.image_url)
+        .filter(url =>
+          typeof url === "string" &&
+          /^\/images\/questions\/[a-f0-9-]+\.(jpg|png|webp)$/i.test(url)
+        )
+        .map(url => url.slice("/images/".length))
+    )];
+
     await env.DB.batch([
+      // Remove image references belonging to this published import.
+      env.DB.prepare(`
+        DELETE FROM staging_question_images
+        WHERE staging_question_id IN (
+          SELECT id
+          FROM questions_staging
+          WHERE published_question_id = ?
+        )
+      `).bind(id),
+
+      // Preserve import history while releasing the foreign key.
+      env.DB.prepare(`
+        UPDATE questions_staging
+        SET published_question_id = NULL
+        WHERE published_question_id = ?
+      `).bind(id),
       env.DB.prepare(`
         DELETE FROM questions
         WHERE id = ?
@@ -1046,9 +1087,39 @@ async function deleteQuestion(id, env) {
       `).bind(String(id), JSON.stringify({ previous_status: existing.status }))
     ]);
 
+    // Clean up R2 only after the database deletion succeeds.
+    const imageCleanupWarnings = [];
+
+    for (const key of imageKeys) {
+      try {
+        const reference = await env.DB.prepare(`
+          SELECT
+            (SELECT COUNT(*)
+             FROM question_images
+             WHERE image_url = ?)
+            +
+            (SELECT COUNT(*)
+             FROM staging_question_images
+             WHERE r2_key = ?) AS total
+        `).bind(`/images/${key}`, key).first();
+
+        if (reference && Number(reference.total) === 0) {
+          if (!env.exam_question_images) {
+            throw new Error("R2 storage is not configured.");
+          }
+
+          await env.exam_question_images.delete(key);
+        }
+      } catch (cleanupError) {
+        console.error("Question image cleanup failed:", key, cleanupError);
+        imageCleanupWarnings.push(key);
+      }
+    }
+
     return jsonResponse({
       success: true,
-      message: "Question deleted successfully."
+      message: "Question deleted successfully.",
+      imageCleanupWarnings
     });
   } catch (error) {
     console.error("Delete question error:", error);
