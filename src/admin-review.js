@@ -18,6 +18,25 @@ function json(data, status = 200) {
   });
 }
 
+// A language is required only when non-empty content was supplied for it.
+async function suppliedLanguages(db, id, enabled) {
+  const result = await db.prepare(`
+    SELECT language_code FROM question_translations_staging
+    WHERE staging_question_id = ? AND (TRIM(question_text) <> '' OR TRIM(COALESCE(explanation, '')) <> '')
+    UNION
+    SELECT ot.language_code FROM option_translations_staging ot
+    JOIN question_options_staging qo ON qo.id = ot.staging_option_id
+    WHERE qo.staging_question_id = ? AND TRIM(ot.option_text) <> ''
+  `).bind(id, id).all();
+  const supplied = new Set((result.results || []).map(row => row.language_code));
+  const scope = await db.prepare(`SELECT el.language_code FROM exam_languages el
+    JOIN import_batches ib ON ib.exam_id = el.exam_id
+    JOIN questions_staging qs ON qs.batch_id = ib.id
+    WHERE qs.id = ? AND el.is_enabled = 1 AND EXISTS (SELECT 1 FROM exam_languages el WHERE el.exam_id = e.id AND el.language_code = l.code AND el.is_enabled = 1)`).bind(id).all();
+  const allowed = new Set((scope.results || []).map(row => row.language_code));
+  return enabled.filter(code => allowed.has(code) && (code === 'en' || supplied.has(code)));
+}
+
 async function listReviewQuestions(request, env) {
   const url = new URL(request.url);
   const examSlug = (url.searchParams.get("exam") || "").trim();
@@ -82,6 +101,11 @@ async function listReviewQuestions(request, env) {
         SELECT 1
         FROM languages l
         WHERE l.is_enabled = 1
+          AND (l.code = 'en' OR EXISTS (
+            SELECT 1 FROM question_translations_staging qx WHERE qx.staging_question_id = qs.id AND qx.language_code = l.code AND (TRIM(qx.question_text) <> '' OR TRIM(COALESCE(qx.explanation, '')) <> '')
+          ) OR EXISTS (
+            SELECT 1 FROM option_translations_staging ox JOIN question_options_staging qox ON qox.id = ox.staging_option_id WHERE qox.staging_question_id = qs.id AND ox.language_code = l.code AND TRIM(ox.option_text) <> ''
+          ))
           AND (
             NOT EXISTS (
               SELECT 1
@@ -110,8 +134,8 @@ async function listReviewQuestions(request, env) {
           FROM question_translations_staging qt3
           JOIN languages l3 ON l3.code = qt3.language_code
           WHERE qt3.staging_question_id = qs.id
-            AND l3.is_enabled = 1
-            AND qt3.translation_source = 'machine'
+            AND l3.is_enabled = 1 AND EXISTS (SELECT 1 FROM exam_languages el WHERE el.exam_id = e.id AND el.language_code = l3.code AND el.is_enabled = 1)
+            AND TRIM(qt3.question_text) <> '' AND qt3.translation_source = 'machine'
         )
         OR EXISTS (
           SELECT 1
@@ -120,15 +144,20 @@ async function listReviewQuestions(request, env) {
             ON ot3.staging_option_id = qos3.id
           JOIN languages l4 ON l4.code = ot3.language_code
           WHERE qos3.staging_question_id = qs.id
-            AND l4.is_enabled = 1
-            AND ot3.translation_source = 'machine'
+            AND l4.is_enabled = 1 AND EXISTS (SELECT 1 FROM exam_languages el WHERE el.exam_id = e.id AND el.language_code = l4.code AND el.is_enabled = 1)
+            AND TRIM(ot3.option_text) <> '' AND ot3.translation_source = 'machine'
         )
       THEN 1 ELSE 0 END AS translation_has_machine,
       CASE WHEN
         NOT EXISTS (
           SELECT 1
           FROM languages l5
-          WHERE l5.is_enabled = 1
+          WHERE l5.is_enabled = 1 AND EXISTS (SELECT 1 FROM exam_languages el WHERE el.exam_id = e.id AND el.language_code = l5.code AND el.is_enabled = 1)
+          AND (l5.code = 'en' OR EXISTS (
+            SELECT 1 FROM question_translations_staging qx WHERE qx.staging_question_id = qs.id AND qx.language_code = l5.code AND (TRIM(qx.question_text) <> '' OR TRIM(COALESCE(qx.explanation, '')) <> '')
+          ) OR EXISTS (
+            SELECT 1 FROM option_translations_staging ox JOIN question_options_staging qox ON qox.id = ox.staging_option_id WHERE qox.staging_question_id = qs.id AND ox.language_code = l5.code AND TRIM(ox.option_text) <> ''
+          ))
             AND (
               NOT EXISTS (
                 SELECT 1
@@ -258,11 +287,10 @@ async function getReviewQuestion(env, id) {
       `).bind(id).all(),
 
       env.DB.prepare(`
-        SELECT code
-        FROM languages
-        WHERE is_enabled = 1
-        ORDER BY sort_order, code
-      `).all()
+        SELECT l.code FROM languages l JOIN exam_languages el ON el.language_code = l.code
+        WHERE l.is_enabled = 1 AND el.is_enabled = 1 AND el.exam_id = ?
+        ORDER BY l.sort_order, l.code
+      `).bind(question.exam_id).all()
     ]);
 
   const enabledLanguages = (enabledLanguagesResult.results || [])
@@ -363,10 +391,9 @@ async function saveReviewQuestion(request, env, id) {
   }
 
   const enabledLanguagesResult = await env.DB.prepare(`
-    SELECT code
-    FROM languages
-    WHERE is_enabled = 1
-  `).all();
+    SELECT l.code FROM languages l JOIN exam_languages el ON el.language_code = l.code
+    WHERE l.is_enabled = 1 AND el.is_enabled = 1 AND el.exam_id = ?
+  `).bind(existing.exam_id).all();
 
   const languages = (enabledLanguagesResult.results || [])
     .map(row => row.code);
@@ -377,7 +404,7 @@ async function saveReviewQuestion(request, env, id) {
 
   for (const language of languages) {
     const item = translations[language];
-    if (!item || typeof item.questionText !== "string") {
+    if (language === "en" && (!item || typeof item.questionText !== "string")) {
       return json({ error: `Missing ${language} question translation.` }, 400);
     }
   }
@@ -412,7 +439,7 @@ async function saveReviewQuestion(request, env, id) {
 
     for (const language of languages) {
       const text = option.translations?.[language]?.text;
-      if (typeof text !== "string") {
+      if (language === "en" && typeof text !== "string") {
         return json({ error: `Missing ${language} translation for option ${option.optionKey}.` }, 400);
       }
     }
@@ -460,7 +487,11 @@ async function saveReviewQuestion(request, env, id) {
   `).bind(topicId, difficulty, id));
 
   for (const language of languages) {
-    const item = translations[language];
+    const item = translations[language] || {};
+    if (!String(item.questionText || "").trim() && !String(item.explanation || "").trim()) {
+      statements.push(env.DB.prepare(`DELETE FROM question_translations_staging WHERE staging_question_id = ? AND language_code = ?`).bind(id, language));
+      continue;
+    }
 
     statements.push(env.DB.prepare(`
       INSERT INTO question_translations_staging (
@@ -476,7 +507,7 @@ async function saveReviewQuestion(request, env, id) {
     `).bind(
       id,
       language,
-      item.questionText.trim(),
+      String(item.questionText || "").trim(),
       String(item.explanation || "")
     ));
   }
@@ -521,6 +552,11 @@ async function saveReviewQuestion(request, env, id) {
 
     // Resolve the option ID inside the batch, including newly inserted options.
     for (const language of languages) {
+      const text = String(option.translations?.[language]?.text || "").trim();
+      if (!text) {
+        statements.push(env.DB.prepare(`DELETE FROM option_translations_staging WHERE language_code = ? AND staging_option_id IN (SELECT id FROM question_options_staging WHERE staging_question_id = ? AND option_key = ?)`).bind(language, id, option.optionKey));
+        continue;
+      }
       statements.push(env.DB.prepare(`
         INSERT INTO option_translations_staging (
           staging_option_id, language_code, option_text, translation_source
@@ -534,7 +570,7 @@ async function saveReviewQuestion(request, env, id) {
           translation_source = 'manual'
       `).bind(
         language,
-        option.translations[language].text.trim(),
+        text,
         id,
         option.optionKey
       ));
@@ -597,7 +633,7 @@ async function bulkReviewQuestions(request, env) {
       WHERE is_enabled = 1
     `).all();
 
-    const languages = (enabledLanguagesResult.results || [])
+    const enabled = (enabledLanguagesResult.results || [])
       .map(row => row.code);
 
     const results = [];
@@ -626,6 +662,7 @@ async function bulkReviewQuestions(request, env) {
       }
 
       if (action === "approve") {
+        const languages = await suppliedLanguages(env.DB, id, enabled);
         if (!languages.includes("en")) {
           results.push({
             id,
@@ -837,9 +874,9 @@ async function bulkPublishQuestions(request, env) {
       WHERE is_enabled = 1
     `).all();
 
-    const languages = (languagesResult.results || []).map(row => row.code);
+    const enabled = (languagesResult.results || []).map(row => row.code);
 
-    if (!languages.includes("en")) {
+    if (!enabled.includes("en")) {
       return json({ error: "English must be enabled." }, 400);
     }
 
@@ -931,6 +968,11 @@ async function bulkPublishQuestions(request, env) {
           ])
         );
 
+        const languages = await suppliedLanguages(env.DB, stagingId, enabled);
+        if (!languages.includes("en")) {
+          results.push({ id: stagingId, success: false, reason: "English must be enabled for this exam." });
+          continue;
+        }
         const missingQuestionLanguage = languages.find(language => {
           const row = translationMap.get(language);
           return !row || !row.question_text.trim() ||
@@ -1147,7 +1189,8 @@ async function bulkPublishQuestions(request, env) {
           WHERE qs.id = ?
             AND qs.status = 'approved'
             AND qs.published_question_id IS NULL
-        `).bind(stagingId));
+          AND qts.language_code IN (${languages.map(() => "?").join(", ")})
+        `).bind(stagingId, ...languages));
 
         statements.push(env.DB.prepare(`
           INSERT INTO question_options (
@@ -1202,7 +1245,8 @@ async function bulkPublishQuestions(request, env) {
           WHERE qs.id = ?
             AND qs.status = 'approved'
             AND qs.published_question_id IS NULL
-        `).bind(stagingId));
+          AND ots.language_code IN (${languages.map(() => "?").join(", ")})
+        `).bind(stagingId, ...languages));
 
         statements.push(env.DB.prepare(`
           INSERT INTO question_images (

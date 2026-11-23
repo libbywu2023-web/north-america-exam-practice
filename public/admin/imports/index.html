@@ -195,7 +195,7 @@
         <p>
           The workbook must contain two sheets named
           <strong>Questions</strong> and <strong>Options</strong>.
-          Keep the column headers unchanged.
+          English question and option text are required. Other language columns and explanations may be omitted.
         </p>
         <div class="import-actions">
           <button type="button" id="download-template" class="secondary-button">
@@ -225,6 +225,7 @@
         </div>
 
         <div class="import-actions">
+          <label><input type="checkbox" id="auto-translate"> Automatically translate missing text into enabled exam languages</label>
           <button type="button" id="preview-button" class="secondary-button">
             Check Workbook
           </button>

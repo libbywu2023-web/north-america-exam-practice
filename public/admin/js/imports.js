@@ -112,7 +112,9 @@ document.getElementById("download-template")
   .addEventListener("click", downloadTemplate);
 
 function readSheet(workbook, sheetName, requiredColumns) {
-  const optionalColumns = ["question_fr", "explanation_fr", "option_fr"];
+  const optionalColumns = ["explanation_en", "question_fr", "explanation_fr", "option_fr",
+    "question_zh_cn", "explanation_zh_cn", "option_zh_cn",
+    "question_zh_tw", "explanation_zh_tw", "option_zh_tw"];
   const sheet = workbook.Sheets[sheetName];
 
   if (!sheet) {
@@ -212,6 +214,7 @@ function getRequestPayload() {
   return {
     examSlug: examSelect.value,
     sourceFilename: selectedFile.name,
+    autoTranslate: document.getElementById("auto-translate").checked,
     questions: parsedWorkbook.questions,
     options: parsedWorkbook.options
   };
