@@ -13,7 +13,8 @@
     activeLanguage: "en",
     languages: [],
     saving: false,
-    selectedIds: new Set()
+    selectedIds: new Set(),
+    listRequestId: 0
   };
 
   const languageNames = {
@@ -93,7 +94,7 @@
     const translationFilter = $("review-translation-filter").value;
 
     const filtered = state.questions.filter(question => {
-      if (examFilter && String(question.exam_id) !== examFilter) return false;
+      if (examFilter && question.exam_slug !== examFilter) return false;
       if (statusFilter && question.status !== statusFilter) return false;
 
       const imageCount = getImageCount(question);
@@ -139,6 +140,7 @@
         </td></tr>`;
       $("review-select-all").checked = false;
       $("review-select-all").indeterminate = false;
+      updateSelectionUI();
       return;
     }
 
@@ -201,6 +203,13 @@
   }
 
   async function loadList() {
+    const requestId = ++state.listRequestId;
+    const selectedExam = $("review-exam-filter").value;
+    const selectedStatus = $("review-status-filter").value;
+    const params = new URLSearchParams();
+    if (selectedExam) params.set("exam", selectedExam);
+    if (selectedStatus) params.set("status", selectedStatus);
+    state.questions = [];
     state.selectedIds.clear();
     updateSelectionUI();
     showMessage($("review-list-message"), "");
@@ -208,16 +217,16 @@
       <tr><td colspan="8" class="review-empty">Loading questions...</td></tr>`;
 
     try {
-      const data = await apiRequest(API_URL);
+      const data = await apiRequest(`${API_URL}?${params}`);
+      if (requestId !== state.listRequestId) return;
       state.questions = data.questions || [];
 
       const exams = data.exams || [];
-      const selectedExam = $("review-exam-filter").value;
 
       $("review-exam-filter").innerHTML = `
         <option value="">All exams</option>
         ${exams.map(exam => `
-          <option value="${Number(exam.id)}">
+          <option value="${escapeHTML(exam.slug)}">
             ${escapeHTML(exam.title || exam.slug)}
           </option>
         `).join("")}
@@ -226,6 +235,7 @@
 
       renderList();
     } catch (error) {
+      if (requestId !== state.listRequestId) return;
       $("review-table-body").innerHTML = `
         <tr><td colspan="8" class="review-empty">
           Unable to load questions.
@@ -860,8 +870,8 @@
       renderList();
     };
 
-    $("review-exam-filter").addEventListener("change", handleFilterChange);
-    $("review-status-filter").addEventListener("change", handleFilterChange);
+    $("review-exam-filter").addEventListener("change", loadList);
+    $("review-status-filter").addEventListener("change", loadList);
     $("review-image-filter").addEventListener("change", handleFilterChange);
     $("review-translation-filter").addEventListener("change", handleFilterChange);
 
