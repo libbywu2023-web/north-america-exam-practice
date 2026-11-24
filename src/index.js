@@ -1,3 +1,4 @@
+import { renderHome } from "./home-page.js";
 import { CATEGORY_PATHS, categoryPath, categoryCopy, categoryLinks, categoryBody } from "./category-pages.js";
 import { handleAdminAuth } from "./admin-auth.js";
 import { handleAdminLanguages } from "./admin-languages.js";
@@ -791,6 +792,7 @@ ${websiteSchema}
   } else if (metadata.homeLinks) {
     html = html.replace(/(<a class="category-filter" href=")\/([a-z-]+)(")/g, (_, start, slug, end) => start + seoPath(metadata.lang, slug) + end);
   }
+  if (metadata.homeExams) html = renderHome(html, metadata.lang, metadata.homeExams, seoPath, seoEscape);
   if (examTitle) {
     html = html.replace('<h1 id="practice-exam-title" class="practice-exam-title" hidden></h1>',
       `<h1 id="practice-exam-title" class="practice-exam-title">${seoEscape(examTitle)}</h1>`);
@@ -924,6 +926,8 @@ export default {
         });
         metadata.canonical = SEO_ORIGIN + seoPath(lang);
         metadata.homeLinks = categoryLinks(lang, seoPath, seoEscape);
+        try { metadata.homeExams = await listCatalogExams(env.DB, lang); }
+        catch (error) { console.error("Homepage catalog SSR failed", error); }
         return seoHtmlResponse(
           await env.ASSETS.fetch(new Request(assetUrl.toString(), request)),
           metadata
@@ -1020,6 +1024,8 @@ export default {
         });
         metadata.canonical = SEO_ORIGIN + "/";
         metadata.homeLinks = categoryLinks("en", seoPath, seoEscape);
+        try { metadata.homeExams = await listCatalogExams(env.DB, "en"); }
+        catch (error) { console.error("Homepage catalog SSR failed", error); }
         return seoHtmlResponse(await env.ASSETS.fetch(request), metadata);
       }
       return env.ASSETS.fetch(request);
