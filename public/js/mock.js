@@ -7,6 +7,9 @@ document.querySelector("#mock-heading").textContent = t.mock;
 document.querySelector("#submit-mock").textContent = t.submit;
 let attemptId = null, questions = [];
 const exam = new URLSearchParams(location.search).get("exam") || "bc-class-7l";
+function trackMock(name, extra = {}) {
+  window.examhereAnalytics?.track(name, { exam_slug: exam, exam_language: lang, practice_mode: 'mock', ...extra });
+}
 const status = document.querySelector("#mock-status");
 const loading = document.querySelector("#mock-loading");
 try {
@@ -36,6 +39,7 @@ try {
     root.append(section);
   });
   document.querySelector("#submit-mock").hidden = false;
+  trackMock("mock_exam_start", { question_count: questions.length });
 } catch (error) {
   loading.hidden = true;
   status.textContent = error.message;
@@ -59,6 +63,7 @@ document.querySelector("#submit-mock").addEventListener("click", async () => {
     box.hidden = false;
     status.textContent = "";
     button.hidden = true;
+    trackMock('mock_exam_complete', { question_count: result.total_questions, answered_count: answers.length, score_percent: result.score_percent, passed: Boolean(result.passed) });
   } catch (error) {
     button.disabled = false;
     alert(error.message);

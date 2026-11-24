@@ -242,6 +242,32 @@ function restoreQuestionOrder(items, savedIds) {
 
 
 let submitting = false;
+let lastTrackedQuestion = null;
+let practiceStarted = false;
+let practiceCompleted = false;
+let trackingRound = 0;
+function trackPractice(name, extra = {}) {
+  window.examhereAnalytics?.track(name, {
+    exam_slug: exam, exam_language: lang, practice_mode: 'practice',
+    set_number: setNumber, ...extra
+  });
+}
+function trackRenderedQuestion(q) {
+  const key = `${trackingRound}:${setNumber}:${index}:${q.id}`;
+  if (!practiceStarted) {
+    practiceStarted = true;
+    trackPractice('practice_start');
+  }
+  if (lastTrackedQuestion === key) return;
+  lastTrackedQuestion = key;
+  trackPractice('question_view', { question_id: String(q.id), question_position: index + 1 });
+}
+function resetPracticeTracking() {
+  trackingRound++;
+  practiceStarted = false;
+  practiceCompleted = false;
+}
+
 
 // Question navigator state.
 let navStart = 0;
@@ -558,6 +584,7 @@ function render() {
   document.querySelector("#next").disabled = index >= questions.length - 1;
 
   savePracticeState();
+  trackRenderedQuestion(q);
   submitting = false;
 }
 
@@ -612,6 +639,11 @@ rootOptions.addEventListener("change", async event => {
     });
 
     savePracticeState();
+    trackPractice('question_answered', { question_id: String(q.id), is_correct: Boolean(result.correct) });
+    if (!practiceCompleted && questions.every(item => answerResults.get(String(item.id))?.submitted)) {
+      practiceCompleted = true;
+      trackPractice('practice_complete', { question_count: questions.length });
+    }
 
     render();
 
@@ -663,6 +695,7 @@ document.querySelector("#retry").addEventListener("click", () => {
   if (!confirmed) return;
 
   answerResults.clear();
+  resetPracticeTracking();
   index = 0;
   navStart = 0;
 
@@ -709,6 +742,7 @@ anotherSetButton?.addEventListener("click", async () => {
     if (!next.length) throw new Error(t.noQuestions);
     questions = next;
     setNumber++;
+    resetPracticeTracking();
     index = 0;
     navStart = 0;
     answerResults.clear();

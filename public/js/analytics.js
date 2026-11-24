@@ -25,6 +25,12 @@
     try { localStorage.setItem(STORAGE_KEY, value); } catch { /* unavailable storage: consent lasts for this page only */ }
   }
   let loaded = false;
+  // Never queue behavioral events before analytics is permitted.
+  function track(name, parameters = {}) {
+    if (!loaded || typeof window.gtag !== 'function') return;
+    window.gtag('event', name, parameters);
+  }
+  window.examhereAnalytics = Object.freeze({ track });
   function loadAnalytics() {
     if (loaded) return;
     loaded = true;
@@ -87,7 +93,7 @@
         writeConsent(value);
         banner.hidden = true;
         if (value === 'accepted') loadAnalytics();
-        else if (loaded) location.reload(); // stop further GA4 collection after withdrawal
+        else if (loaded) { loaded = false; window['ga-disable-' + MEASUREMENT_ID] = true; location.reload(); } // stop further GA4 collection after withdrawal
       });
       actions.appendChild(button);
     }
