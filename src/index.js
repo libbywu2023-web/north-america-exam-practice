@@ -1,3 +1,4 @@
+import { CATEGORY_PATHS, categoryPath, categoryCopy, categoryLinks, categoryBody } from "./category-pages.js";
 import { handleAdminAuth } from "./admin-auth.js";
 import { handleAdminLanguages } from "./admin-languages.js";
 import { handleAdminCountries } from "./admin-countries.js";
@@ -107,6 +108,7 @@ async function listCatalogExams(db, lang) {
       cat.slug AS category_slug,
       COALESCE(cat_t.name, cat.name) AS category_name,
 
+      e.id AS exam_id,
       e.slug,
       COALESCE(et.title, et_en.title) AS title,
       COALESCE(et.description, et_en.description, '') AS description,
@@ -686,8 +688,9 @@ function xmlEscape(value) {
 
 async function sitemapResponse(db) {
   const result = await db.prepare(`
-    SELECT e.slug, el.language_code
+    SELECT e.slug, el.language_code, cat.slug AS category_slug
     FROM exams e
+    JOIN exam_categories cat ON cat.id = e.category_id
     JOIN exam_languages el ON el.exam_id = e.id AND el.is_enabled = 1
     JOIN languages l ON l.code = el.language_code AND l.is_enabled = 1
     JOIN exam_translations et ON et.exam_id = e.id
@@ -702,6 +705,7 @@ async function sitemapResponse(db) {
     const lang = SITEMAP_LANGS.find(item => item.code === row.language_code);
     if (lang && /^[a-z0-9-]+$/.test(row.slug)) {
       urls.push(`${SITEMAP_ORIGIN}${lang.prefix}/${row.slug}`);
+      urls.push(`${SITEMAP_ORIGIN}${lang.prefix}/${categoryPath(row.category_slug)}`);
     }
   }
   const unique = [...new Set(urls)];
@@ -773,6 +777,17 @@ ${websiteSchema}
 <meta property="og:description" content="${metadata.description}">
 <meta property="og:url" content="${seoEscape(metadata.canonical)}">
 </head>`);
+  if (metadata.categoryBody) {
+    html = html.replace(/<main class="homepage-main">[\s\S]*?<\/main>/, () => metadata.categoryBody);
+    html = html.replace(/<div class="home-header-search">[\s\S]*?<\/form>\s*<\/div>/, "");
+    html = html.replace(' <script type="module" src="/js/app.js"></script>', "");
+    html = html.replace(/<script type="module" src="\/js\/app.js"><\/script>/, '<script type="module" src="/js/category-page.js"></script>');
+    if (!html.includes("/js/category-page.js")) html = html.replace("</body>", '<script type="module" src="/js/category-page.js"></script></body>');
+    html = html.replace("Global Exam Practice</span>", seoEscape(categoryCopy(metadata.lang).tagline) + "</span>");
+    if (metadata.noindex) html = html.replace("</head>", '<meta name="robots" content="noindex,follow"></head>');
+  } else if (metadata.homeLinks) {
+    html = html.replace(/(<a class="category-filter" href=")\/([a-z-]+)(")/g, (_, start, slug, end) => start + seoPath(metadata.lang, slug) + end);
+  }
   if (examTitle) {
     html = html.replace('<h1 id="practice-exam-title" class="practice-exam-title" hidden></h1>',
       `<h1 id="practice-exam-title" class="practice-exam-title">${seoEscape(examTitle)}</h1>`);
@@ -905,6 +920,7 @@ export default {
           }))
         });
         metadata.canonical = SEO_ORIGIN + seoPath(lang);
+        metadata.homeLinks = categoryLinks(lang, seoPath, seoEscape);
         return seoHtmlResponse(
           await env.ASSETS.fetch(new Request(assetUrl.toString(), request)),
           metadata
@@ -944,6 +960,24 @@ export default {
         }
 
         if (examSlug) {
+          if (CATEGORY_PATHS.includes(examSlug)) {
+            const rows = await listCatalogExams(env.DB, routeLang);
+            const relevant = rows.filter(e => categoryPath(e.category_slug) === examSlug);
+            const exams = relevant.filter(e => (e.supported_languages || '').split(',').includes(routeLang));
+            const c = categoryCopy(routeLang), i = CATEGORY_PATHS.indexOf(examSlug);
+            const canonical = SEO_ORIGIN + seoPath(routeLang, examSlug);
+            const metadata = seoHead({lang: routeLang, title: c.titles[i] + ' | ExamHere', description: c.descriptions[i], canonical,
+              alternates: SEO_LANGS.filter(l => relevant.some(e => (e.supported_languages || '').split(',').includes(l.code))).map(l => ({code:l.code,url:SEO_ORIGIN+seoPath(l.code,examSlug)}))});
+            metadata.canonical = canonical;
+            metadata.noindex = !exams.length;
+            const resourceRows = await env.DB.prepare(`SELECT er.*, e.slug FROM exam_resources er JOIN exams e ON e.id=er.exam_id WHERE er.is_published=1 AND e.status='published' ORDER BY er.sort_order,er.id`).all();
+            const candidates = (resourceRows.results || []).filter(r => exams.some(e=>e.slug===r.slug));
+            const localizedExams = new Set(candidates.filter(r => r.language_code === routeLang).map(r => r.slug));
+            const resources = candidates.filter(r => r.language_code === (localizedExams.has(r.slug) ? routeLang : "en"));
+            metadata.categoryBody = categoryBody(routeLang, examSlug, exams, seoPath, seoEscape, resources);
+            const assetUrl = new URL(request.url); assetUrl.pathname = '/';
+            return seoHtmlResponse(await env.ASSETS.fetch(new Request(assetUrl, request)), metadata);
+          }
           const policy = await examLanguagePolicy(env.DB, examSlug);
           if (policy && !policy.supported.includes(routeLang)) {
             if (!policy.fallback) return json({ error: 'No public languages available' }, 404);
@@ -987,6 +1021,7 @@ export default {
           }))
         });
         metadata.canonical = SEO_ORIGIN + "/";
+        metadata.homeLinks = categoryLinks("en", seoPath, seoEscape);
         return seoHtmlResponse(await env.ASSETS.fetch(request), metadata);
       }
       return env.ASSETS.fetch(request);

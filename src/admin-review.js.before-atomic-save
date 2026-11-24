@@ -1,0 +1,500 @@
+import { isAdminAuthenticated } from "./admin-auth.js";
+
+const ALLOWED_STATUSES = [
+  "waiting_for_image",
+  "pending_review",
+  "approved",
+  "rejected",
+  "published"
+];
+
+function json(data, status = 200) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store"
+    }
+  });
+}
+
+async function listReviewQuestions(request, env) {
+  const url = new URL(request.url);
+  const examSlug = (url.searchParams.get("exam") || "").trim();
+  const status = (url.searchParams.get("status") || "").trim();
+
+  if (status && !ALLOWED_STATUSES.includes(status)) {
+    return json({ error: "Invalid review status." }, 400);
+  }
+
+  const examsResult = await env.DB.prepare(`
+    SELECT
+      e.slug,
+      COALESCE(et.title, e.slug) AS title,
+      e.status AS exam_status
+    FROM exams e
+    LEFT JOIN exam_translations et
+      ON et.exam_id = e.id
+      AND et.language_code = 'en'
+    ORDER BY e.id DESC
+  `).all();
+
+  const conditions = [];
+  const values = [];
+
+  if (examSlug) {
+    conditions.push("e.slug = ?");
+    values.push(examSlug);
+  }
+
+  if (status) {
+    conditions.push("qs.status = ?");
+    values.push(status);
+  }
+
+  const whereClause = conditions.length
+    ? `WHERE ${conditions.join(" AND ")}`
+    : "";
+
+  const result = await env.DB.prepare(`
+    SELECT
+      qs.id,
+      qs.external_question_id,
+      qs.difficulty,
+      qs.has_image,
+      qs.status,
+      qs.created_at,
+      e.slug AS exam_slug,
+      COALESCE(et.title, e.slug) AS exam_title,
+      COALESCE(qt.question_text, '') AS question_en,
+      (
+        SELECT COUNT(*)
+        FROM question_options_staging qos
+        WHERE qos.staging_question_id = qs.id
+      ) AS option_count,
+      (
+        SELECT COUNT(*)
+        FROM staging_question_images sqi
+        WHERE sqi.staging_question_id = qs.id
+      ) AS image_count
+    FROM questions_staging qs
+    JOIN import_batches ib
+      ON ib.id = qs.batch_id
+    JOIN exams e
+      ON e.id = ib.exam_id
+    LEFT JOIN exam_translations et
+      ON et.exam_id = e.id
+      AND et.language_code = 'en'
+    LEFT JOIN question_translations_staging qt
+      ON qt.staging_question_id = qs.id
+      AND qt.language_code = 'en'
+    ${whereClause}
+    ORDER BY qs.created_at DESC, qs.id DESC
+    LIMIT 500
+  `).bind(...values).all();
+
+  return json({
+    exams: examsResult.results || [],
+    questions: result.results || []
+  });
+}
+
+async function getReviewQuestion(env, id) {
+  const question = await env.DB.prepare(`
+    SELECT
+      qs.id,
+      qs.batch_id,
+      qs.external_question_id,
+      qs.topic_id,
+      qs.difficulty,
+      qs.has_image,
+      qs.status,
+      qs.published_question_id,
+      qs.created_at,
+      ib.source_filename,
+      e.id AS exam_id,
+      e.slug AS exam_slug,
+      COALESCE(et.title, e.slug) AS exam_title,
+      t.slug AS topic_slug,
+      COALESCE(tt.name, t.slug, '') AS topic_name
+    FROM questions_staging qs
+    JOIN import_batches ib
+      ON ib.id = qs.batch_id
+    JOIN exams e
+      ON e.id = ib.exam_id
+    LEFT JOIN exam_translations et
+      ON et.exam_id = e.id
+      AND et.language_code = 'en'
+    LEFT JOIN topics t
+      ON t.id = qs.topic_id
+    LEFT JOIN topic_translations tt
+      ON tt.topic_id = t.id
+      AND tt.language_code = 'en'
+    WHERE qs.id = ?
+  `).bind(id).first();
+
+  if (!question) {
+    return null;
+  }
+
+  const [translationsResult, optionsResult, imagesResult] =
+    await Promise.all([
+      env.DB.prepare(`
+        SELECT
+          language_code,
+          question_text,
+          explanation,
+          translation_source
+        FROM question_translations_staging
+        WHERE staging_question_id = ?
+        ORDER BY language_code
+      `).bind(id).all(),
+
+      env.DB.prepare(`
+        SELECT
+          qos.id,
+          qos.option_key,
+          qos.sort_order,
+          qos.is_correct,
+          ot.language_code,
+          ot.option_text,
+          ot.translation_source
+        FROM question_options_staging qos
+        LEFT JOIN option_translations_staging ot
+          ON ot.staging_option_id = qos.id
+        WHERE qos.staging_question_id = ?
+        ORDER BY qos.sort_order, ot.language_code
+      `).bind(id).all(),
+
+      env.DB.prepare(`
+        SELECT
+          id,
+          r2_key,
+          original_filename,
+          mime_type,
+          alt_text,
+          sort_order,
+          created_at
+        FROM staging_question_images
+        WHERE staging_question_id = ?
+        ORDER BY sort_order, id
+      `).bind(id).all()
+    ]);
+
+  const translations = {};
+  for (const item of translationsResult.results || []) {
+    translations[item.language_code] = {
+      questionText: item.question_text,
+      explanation: item.explanation,
+      translationSource: item.translation_source
+    };
+  }
+
+  const optionsById = new Map();
+
+  for (const item of optionsResult.results || []) {
+    if (!optionsById.has(item.id)) {
+      optionsById.set(item.id, {
+        id: item.id,
+        optionKey: item.option_key,
+        sortOrder: item.sort_order,
+        isCorrect: item.is_correct === 1,
+        translations: {}
+      });
+    }
+
+    if (item.language_code) {
+      optionsById.get(item.id).translations[item.language_code] = {
+        text: item.option_text,
+        translationSource: item.translation_source
+      };
+    }
+  }
+
+  const images = (imagesResult.results || []).map((image) => ({
+    ...image,
+    url: `/images/${image.r2_key}`
+  }));
+
+  return {
+    ...question,
+    hasImage: question.has_image === 1,
+    translations,
+    options: Array.from(optionsById.values()),
+    images
+  };
+}
+
+
+
+async function saveReviewQuestion(request, env, id) {
+  const existing = await env.DB.prepare(`
+    SELECT qs.*, ib.exam_id
+    FROM questions_staging qs
+    JOIN import_batches ib ON ib.id = qs.batch_id
+    WHERE qs.id = ?
+  `).bind(id).first();
+
+  if (!existing) {
+    return json({ error: "Question not found." }, 404);
+  }
+
+  if (existing.status === "published") {
+    return json({ error: "Published questions cannot be edited." }, 409);
+  }
+
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return json({ error: "Invalid JSON body." }, 400);
+  }
+
+  const difficulty = String(body.difficulty || "normal").trim();
+  const topicId = body.topicId ? Number(body.topicId) : null;
+  const translations = body.translations || {};
+  const options = body.options;
+
+  if (!["easy", "normal", "hard"].includes(difficulty)) {
+    return json({ error: "Invalid difficulty." }, 400);
+  }
+
+  if (topicId !== null) {
+    if (!Number.isInteger(topicId) || topicId <= 0) {
+      return json({ error: "Invalid topic." }, 400);
+    }
+
+    const topic = await env.DB.prepare(`
+      SELECT id FROM topics
+      WHERE id = ? AND exam_id = ?
+    `).bind(topicId, existing.exam_id).first();
+
+    if (!topic) {
+      return json({ error: "Topic does not belong to this exam." }, 400);
+    }
+  }
+
+  const languages = ["en", "zh-CN", "zh-TW"];
+
+  for (const language of languages) {
+    const item = translations[language];
+    if (!item || typeof item.questionText !== "string") {
+      return json({ error: `Missing ${language} question translation.` }, 400);
+    }
+  }
+
+  if (!translations.en.questionText.trim()) {
+    return json({ error: "English question is required." }, 400);
+  }
+
+  if (!Array.isArray(options) || options.length < 2 || options.length > 8) {
+    return json({ error: "A question must have 2 to 8 options." }, 400);
+  }
+
+  const keys = new Set();
+  const orders = new Set();
+  let correctCount = 0;
+
+  for (const option of options) {
+    if (!/^[A-H]$/.test(String(option.optionKey || "")) ||
+        keys.has(option.optionKey)) {
+      return json({ error: "Option keys must be unique letters A-H." }, 400);
+    }
+
+    keys.add(option.optionKey);
+
+    const order = Number(option.sortOrder);
+    if (!Number.isInteger(order) || order < 1 || orders.has(order)) {
+      return json({ error: "Option sort orders must be unique positive integers." }, 400);
+    }
+    orders.add(order);
+
+    if (option.isCorrect) correctCount++;
+
+    for (const language of languages) {
+      const text = option.translations?.[language]?.text;
+      if (typeof text !== "string") {
+        return json({ error: `Missing ${language} translation for option ${option.optionKey}.` }, 400);
+      }
+    }
+
+    if (!option.translations.en.text.trim()) {
+      return json({ error: `English text is required for option ${option.optionKey}.` }, 400);
+    }
+  }
+
+  if (correctCount !== 1) {
+    return json({ error: "Exactly one option must be correct." }, 400);
+  }
+
+  const statements = [];
+
+  statements.push(env.DB.prepare(`
+    UPDATE questions_staging
+    SET topic_id = ?,
+        difficulty = ?,
+        status = CASE
+          WHEN status = 'approved' THEN 'pending_review'
+          ELSE status
+        END
+    WHERE id = ?
+  `).bind(topicId, difficulty, id));
+
+  for (const language of languages) {
+    const item = translations[language];
+
+    statements.push(env.DB.prepare(`
+      INSERT INTO question_translations_staging (
+        staging_question_id, language_code, question_text,
+        explanation, translation_source
+      )
+      VALUES (?, ?, ?, ?, 'manual')
+      ON CONFLICT(staging_question_id, language_code)
+      DO UPDATE SET
+        question_text = excluded.question_text,
+        explanation = excluded.explanation,
+        translation_source = 'manual'
+    `).bind(
+      id,
+      language,
+      item.questionText.trim(),
+      String(item.explanation || "")
+    ));
+  }
+
+  const currentResult = await env.DB.prepare(`
+    SELECT id, option_key
+    FROM question_options_staging
+    WHERE staging_question_id = ?
+  `).bind(id).all();
+
+  const currentByKey = new Map(
+    (currentResult.results || []).map(item => [item.option_key, item.id])
+  );
+
+  const submittedKeys = new Set(options.map(item => item.optionKey));
+
+  for (const option of options) {
+    const currentId = currentByKey.get(option.optionKey);
+
+    if (currentId) {
+      statements.push(env.DB.prepare(`
+        UPDATE question_options_staging
+        SET sort_order = ?, is_correct = ?
+        WHERE id = ? AND staging_question_id = ?
+      `).bind(
+        Number(option.sortOrder),
+        option.isCorrect ? 1 : 0,
+        currentId,
+        id
+      ));
+
+      for (const language of languages) {
+        statements.push(env.DB.prepare(`
+          INSERT INTO option_translations_staging (
+            staging_option_id, language_code, option_text, translation_source
+          )
+          VALUES (?, ?, ?, 'manual')
+          ON CONFLICT(staging_option_id, language_code)
+          DO UPDATE SET
+            option_text = excluded.option_text,
+            translation_source = 'manual'
+        `).bind(
+          currentId,
+          language,
+          option.translations[language].text.trim()
+        ));
+      }
+    } else {
+      const result = await env.DB.prepare(`
+        INSERT INTO question_options_staging (
+          staging_question_id, option_key, sort_order, is_correct
+        )
+        VALUES (?, ?, ?, ?)
+      `).bind(
+        id,
+        option.optionKey,
+        Number(option.sortOrder),
+        option.isCorrect ? 1 : 0
+      ).run();
+
+      const newOptionId = result.meta.last_row_id;
+
+      for (const language of languages) {
+        statements.push(env.DB.prepare(`
+          INSERT INTO option_translations_staging (
+            staging_option_id, language_code, option_text, translation_source
+          )
+          VALUES (?, ?, ?, 'manual')
+        `).bind(
+          newOptionId,
+          language,
+          option.translations[language].text.trim()
+        ));
+      }
+    }
+  }
+
+  for (const [key, optionId] of currentByKey) {
+    if (!submittedKeys.has(key)) {
+      statements.push(env.DB.prepare(`
+        DELETE FROM question_options_staging
+        WHERE id = ? AND staging_question_id = ?
+      `).bind(optionId, id));
+    }
+  }
+
+  try {
+    if (statements.length) {
+      await env.DB.batch(statements);
+    }
+
+    const question = await getReviewQuestion(env, id);
+    return json({ success: true, question });
+  } catch (error) {
+    console.error("Review save failed:", error);
+    return json({ error: "Could not save question changes." }, 500);
+  }
+}
+
+export async function handleAdminReview(request, env) {
+  if (!await isAdminAuthenticated(request, env)) {
+    return json({ error: "Unauthorized." }, 401);
+  }
+
+  const url = new URL(request.url);
+
+  if (url.pathname === "/api/admin/review" && request.method === "GET") {
+    try {
+      return await listReviewQuestions(request, env);
+    } catch (error) {
+      console.error("Review list failed:", error);
+      return json({ error: "Could not load review questions." }, 500);
+    }
+  }
+
+  const match = url.pathname.match(
+    /^\/api\/admin\/review\/(\d+)$/
+  );
+
+  if (match && request.method === "PUT") {
+    return await saveReviewQuestion(request, env, Number(match[1]));
+  }
+
+  if (match && request.method === "GET") {
+    try {
+      const question = await getReviewQuestion(env, Number(match[1]));
+
+      if (!question) {
+        return json({ error: "Question not found." }, 404);
+      }
+
+      return json({ question });
+    } catch (error) {
+      console.error("Review detail failed:", error);
+      return json({ error: "Could not load question details." }, 500);
+    }
+  }
+
+  return json({ error: "Not found." }, 404);
+}

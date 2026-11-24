@@ -1,3 +1,5 @@
+import { resourceAdmin } from "./exam-resources.js";
+import { CATEGORY_PATHS } from "./category-pages.js";
 import { translateTexts } from "./services/translation.js";
 
 import { isAdminAuthenticated } from "./admin-auth.js";
@@ -294,7 +296,7 @@ async function handleReviewAll(id, request, env) {
 }
 
 function validateSlug(slug) {
-  return typeof slug === "string" &&
+  return typeof slug === "string" && !CATEGORY_PATHS.includes(slug) &&
     /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug);
 }
 
@@ -1099,6 +1101,8 @@ export async function handleAdminExams(request, env) {
     return jsonResponse({ error: "Method not allowed." }, 405);
   }
 
+  const resourceMatch = url.pathname.match(/^\/api\/admin\/exams\/(\d+)\/resources(?:\/(\d+))?$/);
+  if(resourceMatch) return resourceAdmin(request,env,Number(resourceMatch[1]),Number(resourceMatch[2])||null,jsonResponse);
   const queueMatch = url.pathname.match(/^\/api\/admin\/exams\/(\d+)\/review-queue$/);
   if (queueMatch) {
     if (method !== 'GET') return jsonResponse({error:'Method not allowed.'},405);

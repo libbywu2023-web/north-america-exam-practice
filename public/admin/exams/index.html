@@ -247,6 +247,18 @@
         </div>
       </div>
 
+      <section class="module-card" id="resource-admin" style="padding:20px;margin:20px 0">
+        <h2>Official Study Resources</h2><p>Choose an existing exam. Resource changes are saved separately.</p>
+        <label>Exam <select id="resource-exam"></select></label><div id="resource-list"></div>
+        <form id="resource-form" style="display:grid;gap:10px;max-width:650px;margin-top:16px">
+          <input type="hidden" id="resource-id"><label>Title <input id="resource-title" required maxlength="200"></label>
+          <label>Official organization <input id="resource-org" required maxlength="120"></label>
+          <label>Official HTTPS URL <input id="resource-url" type="url" required></label>
+          <label>Language <select id="resource-language"><option value="en">English</option><option value="fr">Français</option><option value="zh-CN">简体中文</option><option value="zh-TW">繁體中文</option></select></label>
+          <label>Sort order <input id="resource-order" type="number" step="1" value="0"></label><label><input id="resource-published" type="checkbox"> Published</label>
+          <div><button class="primary-button" type="submit">Save resource</button> <button type="button" id="resource-clear">New resource</button></div>
+        </form><p id="resource-message" role="status"></p>
+      </section>
       <footer class="admin-footer">
         North America Exam Practice CMS
       </footer>
@@ -255,5 +267,6 @@
 
   <script src="/admin/js/dashboard.js"></script>
   <script src="/admin/js/exams.js"></script>
+  <script src="/admin/js/exam-resources.js"></script>
 </body>
 </html>

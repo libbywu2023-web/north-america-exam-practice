@@ -85,10 +85,10 @@ const homeCopy = {
 
 
 // Homepage sections: translated content remains consistent with the language selector.
-Object.assign(homeCopy["en"], {"categoryHeading": "Browse Free Practice Tests by Exam Category", "categoryIntro": "Explore driving knowledge tests, citizenship exams, professional certifications, and other standardized exams. Choose a category to filter the available practice tests by country and region.", "showAll": "Show all exam categories", "countryHeading": "Explore Practice Tests by Country", "countryIntro": "Find free practice tests organized by country, province and state. Select an exam to start preparing.", "popularHeading": "Popular Practice Tests", "popularIntro": "Start with a published practice test and review questions at your own pace.", "preparationHeading": "How to Prepare for Your Exam", "prep1Title": "Know the Exam Format", "prep1Text": "Check the official exam format, time limit, passing score and topics before you begin studying.", "prep2Title": "Practice with Questions", "prep2Text": "Use online practice questions to become familiar with the subject matter and test-style questions.", "prep3Title": "Review and Improve", "prep3Text": "Review answers and explanations, identify weak areas and repeat practice as needed.", "faqHeading": "Frequently Asked Questions", "faq1q": "Are the practice tests free?", "faq1a": "Yes. You can access the available online practice questions for free.", "faq2q": "Do I need to create an account?", "faq2a": "No account is required to start using the available practice tests.", "faq3q": "Are these official exam questions?", "faq3a": "No. These are independent study resources, not official examination questions. Always consult the relevant official exam authority for current requirements.", "faq4q": "Which exams can I practice?", "faq4a": "Browse the country directory above for currently available driving and citizenship practice tests. More exam categories will be added.", "faq5q": "Which languages are supported?", "faq5a": "The website supports English, French, Simplified Chinese and Traditional Chinese. Available languages can vary by exam."});
-Object.assign(homeCopy["zh-CN"], {"categoryHeading": "按考试类别浏览免费练习题", "categoryIntro": "探索驾照理论考试、入籍考试、职业资格认证及其他标准化考试。选择类别，按国家和地区筛选已上线的练习题。", "showAll": "显示全部考试类别", "countryHeading": "按国家浏览考试练习", "countryIntro": "按照国家、省份和州查找免费练习题，选择考试开始备考。", "popularHeading": "热门考试练习", "popularIntro": "选择已发布的考试，按照自己的节奏进行练习。", "preparationHeading": "如何准备考试", "prep1Title": "了解考试形式", "prep1Text": "先查看官方考试题型、时间限制、及格分数和考试范围。", "prep2Title": "通过练习题备考", "prep2Text": "使用在线练习题熟悉知识点和考试题型。", "prep3Title": "复习并提高", "prep3Text": "查看答案和解析，找出薄弱知识点并重复练习。", "faqHeading": "常见问题", "faq1q": "练习题免费吗？", "faq1a": "是的，网站提供的在线练习题可以免费使用。", "faq2q": "需要注册账号吗？", "faq2a": "不需要注册账号即可开始练习。", "faq3q": "这些是官方考试原题吗？", "faq3a": "不是。这些是独立的学习资源，并非官方考试题目。最新考试要求请以主管机构公布的信息为准。", "faq4q": "目前可以练习哪些考试？", "faq4a": "请查看上方国家目录，了解已上线的驾考和入籍考试练习。其他类别将陆续增加。", "faq5q": "支持哪些语言？", "faq5a": "网站支持英语、法语、简体中文和繁体中文；具体考试可用语言可能不同。"});
-Object.assign(homeCopy["zh-TW"], {"categoryHeading": "依考試類別瀏覽免費練習題", "categoryIntro": "探索駕照筆試、入籍考試、職業資格認證及其他標準化考試。選擇類別，依國家和地區篩選已上線的練習題。", "showAll": "顯示全部考試類別", "countryHeading": "依國家瀏覽考試練習", "countryIntro": "依國家、省份和州尋找免費練習題，選擇考試開始準備。", "popularHeading": "熱門考試練習", "popularIntro": "選擇已發布的考試，依照自己的步調練習。", "preparationHeading": "如何準備考試", "prep1Title": "了解考試形式", "prep1Text": "先查看官方考試題型、時間限制、及格分數和考試範圍。", "prep2Title": "透過練習題準備", "prep2Text": "使用線上練習題熟悉知識點和考試題型。", "prep3Title": "複習並進步", "prep3Text": "查看答案與解析，找出薄弱環節並重複練習。", "faqHeading": "常見問題", "faq1q": "練習題免費嗎？", "faq1a": "是的，網站提供的線上練習題可以免費使用。", "faq2q": "需要註冊帳號嗎？", "faq2a": "不需要註冊帳號即可開始練習。", "faq3q": "這些是官方考試原題嗎？", "faq3a": "不是。這些是獨立的學習資源，並非官方考試題目。最新考試要求請以主管機關公布的資訊為準。", "faq4q": "目前可以練習哪些考試？", "faq4a": "請查看上方國家目錄，了解已上線的駕考和入籍考試練習。其他類別將陸續增加。", "faq5q": "支援哪些語言？", "faq5a": "網站支援英語、法語、簡體中文和繁體中文；各考試可用語言可能不同。"});
-Object.assign(homeCopy["fr"], {"categoryHeading": "Explorer les tests gratuits par catégorie", "categoryIntro": "Découvrez les examens de conduite, de citoyenneté, les certifications professionnelles et autres tests. Sélectionnez une catégorie pour filtrer les examens disponibles.", "showAll": "Afficher toutes les catégories", "countryHeading": "Explorer les examens par pays", "countryIntro": "Trouvez des tests gratuits par pays et région. Sélectionnez un examen pour commencer.", "popularHeading": "Tests populaires", "popularIntro": "Choisissez un test disponible et entraînez-vous à votre rythme.", "preparationHeading": "Comment préparer votre examen", "prep1Title": "Connaître le format", "prep1Text": "Consultez le format officiel, la durée, le seuil de réussite et les sujets abordés.", "prep2Title": "S’entraîner avec des questions", "prep2Text": "Utilisez des questions en ligne pour vous familiariser avec les sujets et les types de questions.", "prep3Title": "Réviser et progresser", "prep3Text": "Vérifiez les réponses et les explications, puis travaillez vos points faibles.", "faqHeading": "Questions fréquentes", "faq1q": "Les tests sont-ils gratuits ?", "faq1a": "Oui. Les questions d’entraînement disponibles sont gratuites.", "faq2q": "Dois-je créer un compte ?", "faq2a": "Non, aucun compte n’est nécessaire pour commencer.", "faq3q": "S’agit-il de questions officielles ?", "faq3a": "Non. Ce sont des ressources pédagogiques indépendantes et non des questions officielles. Consultez les autorités compétentes pour les exigences actuelles.", "faq4q": "Quels examens sont disponibles ?", "faq4a": "Consultez la liste par pays ci-dessus pour voir les tests de conduite et de citoyenneté disponibles.", "faq5q": "Quelles langues sont proposées ?", "faq5a": "Le site propose l’anglais, le français, le chinois simplifié et le chinois traditionnel. Les langues disponibles varient selon l’examen."});
+Object.assign(homeCopy["en"], {"categoryHeading": "Browse Free Practice Tests by Exam Category", "categoryIntro": "Explore driving knowledge tests, citizenship exams, professional certifications, and other standardized exams. Choose a category to browse practice tests by country and region.", "showAll": "View all practice tests ↓", "countryHeading": "Explore Practice Tests by Country", "countryIntro": "Find free practice tests organized by country, province and state. Select an exam to start preparing.", "popularHeading": "Popular Practice Tests", "popularIntro": "Start with a published practice test and review questions at your own pace.", "preparationHeading": "How to Prepare for Your Exam", "prep1Title": "Know the Exam Format", "prep1Text": "Check the official exam format, time limit, passing score and topics before you begin studying.", "prep2Title": "Practice with Questions", "prep2Text": "Use online practice questions to become familiar with the subject matter and test-style questions.", "prep3Title": "Review and Improve", "prep3Text": "Review answers and explanations, identify weak areas and repeat practice as needed.", "faqHeading": "Frequently Asked Questions", "faq1q": "Are the practice tests free?", "faq1a": "Yes. You can access the available online practice questions for free.", "faq2q": "Do I need to create an account?", "faq2a": "No account is required to start using the available practice tests.", "faq3q": "Are these official exam questions?", "faq3a": "No. These are independent study resources, not official examination questions. Always consult the relevant official exam authority for current requirements.", "faq4q": "Which exams can I practice?", "faq4a": "Browse the country directory above for currently available driving and citizenship practice tests. More exam categories will be added.", "faq5q": "Which languages are supported?", "faq5a": "The website supports English, French, Simplified Chinese and Traditional Chinese. Available languages can vary by exam."});
+Object.assign(homeCopy["zh-CN"], {"categoryHeading": "按考试类别浏览免费练习题", "categoryIntro": "探索驾照理论考试、入籍考试、职业资格认证及其他标准化考试。选择类别，按国家和地区浏览已上线的练习题。", "showAll": "查看全部考试练习 ↓", "countryHeading": "按国家浏览考试练习", "countryIntro": "按照国家、省份和州查找免费练习题，选择考试开始备考。", "popularHeading": "热门考试练习", "popularIntro": "选择已发布的考试，按照自己的节奏进行练习。", "preparationHeading": "如何准备考试", "prep1Title": "了解考试形式", "prep1Text": "先查看官方考试题型、时间限制、及格分数和考试范围。", "prep2Title": "通过练习题备考", "prep2Text": "使用在线练习题熟悉知识点和考试题型。", "prep3Title": "复习并提高", "prep3Text": "查看答案和解析，找出薄弱知识点并重复练习。", "faqHeading": "常见问题", "faq1q": "练习题免费吗？", "faq1a": "是的，网站提供的在线练习题可以免费使用。", "faq2q": "需要注册账号吗？", "faq2a": "不需要注册账号即可开始练习。", "faq3q": "这些是官方考试原题吗？", "faq3a": "不是。这些是独立的学习资源，并非官方考试题目。最新考试要求请以主管机构公布的信息为准。", "faq4q": "目前可以练习哪些考试？", "faq4a": "请查看上方国家目录，了解已上线的驾考和入籍考试练习。其他类别将陆续增加。", "faq5q": "支持哪些语言？", "faq5a": "网站支持英语、法语、简体中文和繁体中文；具体考试可用语言可能不同。"});
+Object.assign(homeCopy["zh-TW"], {"categoryHeading": "依考試類別瀏覽免費練習題", "categoryIntro": "探索駕照筆試、入籍考試、職業資格認證及其他標準化考試。選擇類別，依國家和地區瀏覽已上線的練習題。", "showAll": "查看全部考試練習 ↓", "countryHeading": "依國家瀏覽考試練習", "countryIntro": "依國家、省份和州尋找免費練習題，選擇考試開始準備。", "popularHeading": "熱門考試練習", "popularIntro": "選擇已發布的考試，依照自己的步調練習。", "preparationHeading": "如何準備考試", "prep1Title": "了解考試形式", "prep1Text": "先查看官方考試題型、時間限制、及格分數和考試範圍。", "prep2Title": "透過練習題準備", "prep2Text": "使用線上練習題熟悉知識點和考試題型。", "prep3Title": "複習並進步", "prep3Text": "查看答案與解析，找出薄弱環節並重複練習。", "faqHeading": "常見問題", "faq1q": "練習題免費嗎？", "faq1a": "是的，網站提供的線上練習題可以免費使用。", "faq2q": "需要註冊帳號嗎？", "faq2a": "不需要註冊帳號即可開始練習。", "faq3q": "這些是官方考試原題嗎？", "faq3a": "不是。這些是獨立的學習資源，並非官方考試題目。最新考試要求請以主管機關公布的資訊為準。", "faq4q": "目前可以練習哪些考試？", "faq4a": "請查看上方國家目錄，了解已上線的駕考和入籍考試練習。其他類別將陸續增加。", "faq5q": "支援哪些語言？", "faq5a": "網站支援英語、法語、簡體中文和繁體中文；各考試可用語言可能不同。"});
+Object.assign(homeCopy["fr"], {"categoryHeading": "Explorer les tests gratuits par catégorie", "categoryIntro": "Découvrez les examens de conduite, de citoyenneté, les certifications professionnelles et autres tests. Sélectionnez une catégorie pour découvrir les examens disponibles.", "showAll": "Voir tous les tests pratiques ↓", "countryHeading": "Explorer les examens par pays", "countryIntro": "Trouvez des tests gratuits par pays et région. Sélectionnez un examen pour commencer.", "popularHeading": "Tests populaires", "popularIntro": "Choisissez un test disponible et entraînez-vous à votre rythme.", "preparationHeading": "Comment préparer votre examen", "prep1Title": "Connaître le format", "prep1Text": "Consultez le format officiel, la durée, le seuil de réussite et les sujets abordés.", "prep2Title": "S’entraîner avec des questions", "prep2Text": "Utilisez des questions en ligne pour vous familiariser avec les sujets et les types de questions.", "prep3Title": "Réviser et progresser", "prep3Text": "Vérifiez les réponses et les explications, puis travaillez vos points faibles.", "faqHeading": "Questions fréquentes", "faq1q": "Les tests sont-ils gratuits ?", "faq1a": "Oui. Les questions d’entraînement disponibles sont gratuites.", "faq2q": "Dois-je créer un compte ?", "faq2a": "Non, aucun compte n’est nécessaire pour commencer.", "faq3q": "S’agit-il de questions officielles ?", "faq3a": "Non. Ce sont des ressources pédagogiques indépendantes et non des questions officielles. Consultez les autorités compétentes pour les exigences actuelles.", "faq4q": "Quels examens sont disponibles ?", "faq4a": "Consultez la liste par pays ci-dessus pour voir les tests de conduite et de citoyenneté disponibles.", "faq5q": "Quelles langues sont proposées ?", "faq5a": "Le site propose l’anglais, le français, le chinois simplifié et le chinois traditionnel. Les langues disponibles varient selon l’examen."});
 const benefitCopy = {
   en: ["Free Practice Tests", "No registration required", "Multilingual Support", "English · Français · 中文", "Multiple Exam Types", "Driving · Citizenship · Certification", "Study Anytime", "On desktop, tablet or mobile"],
   "zh-CN": ["免费练习题", "无需注册", "多语言支持", "英语 · 法语 · 中文", "多种考试类型", "驾考 · 入籍 · 职业资格", "随时学习", "支持电脑、平板和手机"],
@@ -270,26 +270,15 @@ function renderCategories() {
   const descriptions = categoryDescriptions[lang] || categoryDescriptions.en;
   categoryDefinitions.slice(1).forEach((category, index) => {
     const count = allExams.filter(exam => matchesCategory(exam, category.slug)).length;
-    const button = createElement("button", "category-filter");
-    button.type = "button";
+    const button = createElement("a", "category-filter");
+    const prefix = { en: "", fr: "/fr", "zh-CN": "/zh", "zh-TW": "/zh-tw" }[lang] || "";
+    button.href = `${prefix}/${["driving-tests", "citizenship-tests", "professional-certification", "other-exams"][index]}`;
     button.dataset.category = category.slug;
-    button.setAttribute("aria-pressed", String(activeCategory === category.slug));
     const symbol = homeIcon(["car", "id", "briefcase", "grid"][index], "category-symbol");
     const heading = createElement("strong", "category-name", copy[category.label]);
     const description = createElement("span", "category-description", descriptions[index]);
     const action = createElement("span", "category-action", count ? `${copy[category.label]} (${count}) →` : `${copy[category.label]} →`);
     button.append(symbol, heading, description, action);
-    if (activeCategory === category.slug) {
-      const check = createElement("span", "category-selected-check", "✓");
-      check.setAttribute("aria-hidden", "true");
-      button.append(check);
-    }
-    button.addEventListener("click", () => {
-      activeCategory = activeCategory === category.slug ? "all" : category.slug;
-      renderCategories();
-      renderCatalog(searchInput?.value || "");
-      revealFilteredCatalog();
-    });
     categoryRoot.append(button);
   });
 }
@@ -335,6 +324,8 @@ clearFilterButton?.addEventListener("click", clearCatalogFilters);
 const showAllButton = document.querySelector("#show-all-exams");
 showAllButton?.addEventListener("click", () => {
   clearCatalogFilters();
+  document.querySelector("#country-heading")?.focus({ preventScroll: true });
+  countryBrowser?.scrollIntoView({ behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
 });
 
 function createElement(tag, className, text) {
@@ -368,20 +359,16 @@ function createExamLink(exam) {
   // NEW is controlled manually in the exam admin settings.
   if (Number(exam.show_new_badge) === 1) {
     const badge = createElement("span", "catalog-new-badge", "NEW");
-    link.append(document.createTextNode(" "), badge);
+    link.append(document.createTextNode("\u00a0"), badge);
   }
   return link;
 }
 
 function appendExamLinks(container, exams) {
-  exams.forEach((exam, index) => {
-    if (index > 0) {
-      container.append(
-        document.createTextNode(" · ")
-      );
-    }
-
-    container.append(createExamLink(exam));
+  exams.forEach(exam => {
+    const item = createElement("div", "catalog-exam-item");
+    item.append(createExamLink(exam));
+    container.append(item);
   });
 }
 

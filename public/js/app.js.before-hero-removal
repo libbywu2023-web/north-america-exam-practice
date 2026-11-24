@@ -1,0 +1,141 @@
+
+import { api, copy, getLanguage, setLanguageSelect } from "./common.js";
+
+const lang = getLanguage();
+const t = copy[lang];
+
+setLanguageSelect(lang);
+document.documentElement.lang = lang;
+
+const isChinese = lang !== "en";
+
+const labels = {
+  allTopics: {
+    en: "Practice all questions",
+    "zh-CN": "练习全部题目",
+    "zh-TW": "練習全部題目"
+  },
+  topics: {
+    en: "Practice by topic",
+    "zh-CN": "按知识点练习",
+    "zh-TW": "按知識點練習"
+  },
+  mixed: {
+    en: "Mixed Practice",
+    "zh-CN": "混合练习",
+    "zh-TW": "混合練習"
+  },
+  questionCount: {
+    en: "sample questions",
+    "zh-CN": "道示例题",
+    "zh-TW": "道示例題"
+  },
+  loading: {
+    en: "Loading...",
+    "zh-CN": "正在加载...",
+    "zh-TW": "正在載入..."
+  }
+};
+
+document.querySelector("#page-title").textContent =
+  lang === "zh-CN" ? "练习 BC 驾驶知识测试" :
+  lang === "zh-TW" ? "練習 BC 駕駛知識測驗" :
+  "Practice for your BC driving knowledge test";
+
+document.querySelector("#intro").textContent =
+  lang === "zh-CN" ? "选择学习模式，一题一题建立信心。" :
+  lang === "zh-TW" ? "選擇學習模式，一題一題建立信心。" :
+  "Choose a study mode and build confidence one question at a time.";
+
+//document.querySelector("#mock-title").textContent = t.mock;
+document.querySelector("#disclaimer").textContent = t.disclaimer;
+
+const root = document.querySelector("#exam-card");
+
+function createLink(text, href, className) {
+  const link = document.createElement("a");
+  link.className = className;
+  link.href = href;
+  link.textContent = text;
+  return link;
+}
+
+try {
+  const examList = await api(
+    `/api/exams?lang=${encodeURIComponent(lang)}`
+  );
+
+  const exam = examList.exams.find(
+    item => item.slug === "bc-class-7l"
+  );
+
+  if (!exam) {
+    root.textContent = t.noQuestions;
+  } else {
+    const detail = await api(
+      `/api/exams/${encodeURIComponent(exam.slug)}?lang=${encodeURIComponent(lang)}`
+    );
+
+    const topics = detail.topics || [];
+
+    root.innerHTML = "";
+
+    // Country, region and exam category breadcrumb.
+    const eyebrow = document.createElement("p");
+    eyebrow.className = "eyebrow exam-location";
+    eyebrow.textContent =
+      lang === "zh-CN"
+        ? "🇨🇦 CA  ›  不列颠哥伦比亚省  ›  🚗 驾驶"
+        : lang === "zh-TW"
+        ? "🇨🇦 CA  ›  不列顛哥倫比亞省  ›  🚗 駕駛"
+        : "🇨🇦 CA  ›  BRITISH COLUMBIA  ›  🚗 DRIVING";
+
+    const heading = document.createElement("h2");
+    heading.textContent = exam.title;
+
+    const description = document.createElement("p");
+    description.className = "muted";
+    description.textContent = exam.description || "";
+
+    const mainButtons = document.createElement("div");
+    mainButtons.className = "button-row main-action-row";
+
+    mainButtons.append(
+      createLink(
+        labels.allTopics[lang],
+        `/practice.html?exam=${encodeURIComponent(exam.slug)}&lang=${encodeURIComponent(lang)}`,
+        "primary"
+      )
+    );
+
+    const topicHeading = document.createElement("h3");
+    topicHeading.textContent = labels.topics[lang];
+
+    const topicList = document.createElement("div");
+    topicList.className = "button-row";
+
+    topics
+      .filter(topic => topic.topic_type !== "mixed")
+      .sort((a, b) => a.sort_order - b.sort_order)
+      .forEach(topic => {
+        const link = createLink(
+          topic.name,
+          `/practice.html?exam=${encodeURIComponent(exam.slug)}&topic=${encodeURIComponent(topic.slug)}&lang=${encodeURIComponent(lang)}`,
+          "secondary"
+        );
+
+        topicList.append(link);
+      });
+
+    root.append(
+      eyebrow,
+      heading,
+      description,
+      mainButtons,
+      topicHeading,
+      topicList
+    );
+  }
+} catch (error) {
+  root.textContent = error.message;
+}
