@@ -1,13 +1,15 @@
 import { api, copy, getLanguage, setLanguageSelect, setHomeLinks } from "./common.js";
 
-const lang = getLanguage();
-const t = copy[lang];
-const practiceLabels = {
+let lang = getLanguage();
+let questionLang = lang;
+let t = copy[lang];
+const practiceLabelsByLanguage = {
   fr: { position: (n,total) => `Question ${n} sur ${total}`, perSet: n => `${n} questions par série` },
   en: { position: (n,total) => `Question ${n} of ${total}`, perSet: n => `${n} questions per set` },
   "zh-CN": { position: (n,total) => `第 ${n} / ${total} 题`, perSet: n => `每组 ${n} 题` },
   "zh-TW": { position: (n,total) => `第 ${n} / ${total} 題`, perSet: n => `每組 ${n} 題` }
-}[lang];
+};
+let practiceLabels = practiceLabelsByLanguage[lang];
 let perSetCount = null;
 function updatePerSet() {
   const label = document.querySelector("#practice-per-set");
@@ -56,11 +58,11 @@ function updateSeo(examInfo) {
     `${examInfo.title} practice questions on ExamHere.`;
 
   const canonicalPath =
-    lang === "fr"
+    questionLang === "fr"
       ? `/fr/${encodeURIComponent(exam)}`
-      : lang === "zh-CN"
+      : questionLang === "zh-CN"
       ? `/zh/${encodeURIComponent(exam)}`
-      : lang === "zh-TW"
+      : questionLang === "zh-TW"
         ? `/zh-tw/${encodeURIComponent(exam)}`
         : `/${encodeURIComponent(exam)}`;
 
@@ -101,8 +103,8 @@ function updateSeo(examInfo) {
     ?.setAttribute("content", localeMap[lang] || "en_CA");
 }
 
-setLanguageSelect(lang);
 setHomeLinks();
+function applyPracticeLanguage() {
 document.documentElement.lang = lang;
 
 document.querySelector("#choose-label").textContent = t.choose;
@@ -112,6 +114,8 @@ document.querySelector("#back-link").textContent = `← ${t.allExams}`;
 
 document.querySelector("#previous-text").textContent = t.previous;
 document.querySelector("#next-text").textContent = t.next;
+}
+applyPracticeLanguage();
 
 
 // Read exam slug from clean URL or legacy query parameters.
@@ -248,7 +252,7 @@ let practiceCompleted = false;
 let trackingRound = 0;
 function trackPractice(name, extra = {}) {
   window.examhereAnalytics?.track(name, {
-    exam_slug: exam, exam_language: lang, practice_mode: 'practice',
+    exam_slug: exam, exam_language: questionLang, practice_mode: 'practice',
     set_number: setNumber, ...extra
   });
 }
@@ -276,7 +280,7 @@ const rootOptions = document.querySelector("#options");
 
 // Fetch only the current practice set. Topic practice retains its own selection rules.
 async function loadSet({ newSet = false } = {}) {
-  const apiParams = new URLSearchParams({ lang });
+  const apiParams = new URLSearchParams({ lang: questionLang });
   if (topic) apiParams.set("topic", topic);
   if (!topic && !newSet && practiceState.questionIds.length) {
     apiParams.set("ids", practiceState.questionIds.join(","));
@@ -294,13 +298,12 @@ async function loadSet({ newSet = false } = {}) {
 try {
   // Load exam policy before requesting questions. The server also enforces it.
   const examMetadata = await api(`/api/exams/${encodeURIComponent(exam)}?lang=${encodeURIComponent(lang)}`);
-  const allowedLanguages = examMetadata.supported_languages || [];
-  const languageSelect = document.querySelector('#language');
-  if (languageSelect) {
-    for (const option of [...languageSelect.options]) {
-      if (!allowedLanguages.includes(option.value)) option.remove();
-    }
-  }
+  questionLang = examMetadata.question_language || lang;
+  lang = questionLang;
+  t = copy[lang];
+  practiceLabels = practiceLabelsByLanguage[lang];
+  setLanguageSelect(lang, { examLanguages: examMetadata.supported_languages });
+  applyPracticeLanguage();
   questions = await loadSet();
   if (!questions.length) throw new Error(t.noQuestions);
   if (!topic && !practiceState.questionIds.length) {
@@ -320,7 +323,7 @@ try {
       if (!savedResult?.submitted) return;
 
       const result = await api(
-        `/api/questions/${q.id}/answer?lang=${encodeURIComponent(lang)}`,
+        `/api/questions/${q.id}/answer?lang=${encodeURIComponent(questionLang)}`,
         {
           method: "POST",
           body: JSON.stringify({
@@ -616,7 +619,7 @@ rootOptions.addEventListener("change", async event => {
 
   try {
     const result = await api(
-      `/api/questions/${q.id}/answer?lang=${encodeURIComponent(lang)}`,
+      `/api/questions/${q.id}/answer?lang=${encodeURIComponent(questionLang)}`,
       {
         method: "POST",
         body: JSON.stringify({

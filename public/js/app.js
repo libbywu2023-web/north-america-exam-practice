@@ -347,13 +347,9 @@ function createExamLink(exam) {
 
   const slug = encodeURIComponent(exam.slug);
 
-  const supported = String(exam.supported_languages || '').split(',');
-  const effective = supported.includes(lang) ? lang :
-    supported.includes(exam.default_language) ? exam.default_language :
-    supported.includes('en') ? 'en' : supported[0];
-  if (effective === 'fr') link.href = `/fr/${slug}`;
-  else if (effective === 'zh-CN') link.href = `/zh/${slug}`;
-  else if (effective === 'zh-TW') link.href = `/zh-tw/${slug}`;
+  if (lang === 'fr') link.href = `/fr/${slug}`;
+  else if (lang === 'zh-CN') link.href = `/zh/${slug}`;
+  else if (lang === 'zh-TW') link.href = `/zh-tw/${slug}`;
   else link.href = `/${slug}`;
 
   // NEW is controlled manually in the exam admin settings.

@@ -44,8 +44,7 @@ async function examLanguagePolicy(db, slug) {
     ORDER BY l.sort_order, l.code
   `).bind(exam.id).all();
   const supported = (result.results || []).map(row => row.language_code);
-  const fallback = supported.includes(exam.default_language)
-    ? exam.default_language : supported.includes('en') ? 'en' : supported[0];
+  const fallback = supported.includes('en') ? 'en' : supported.includes(exam.default_language) ? exam.default_language : supported[0];
   return { ...exam, supported, fallback };
 }
 
@@ -316,7 +315,7 @@ async function api(request, env) {
   if (!env.DB) return json({ error: "D1 binding DB is not configured." }, 500);
   const url = new URL(request.url);
   const path = url.pathname;
-  const lang = languageOrDefault(url.searchParams.get("lang") || "en");
+  let lang = languageOrDefault(url.searchParams.get("lang") || "en");
 
   if (request.method === "GET" && path === "/api/health") {
     await env.DB.prepare("SELECT 1").first();
@@ -336,7 +335,8 @@ async function api(request, env) {
   if (request.method === "GET" && examMatch) {
     const policy = await examLanguagePolicy(env.DB, examMatch[1]);
     if (!policy) return json({ error: 'Exam not found' }, 404);
-    if (!policy.supported.includes(lang)) return json({ error: 'Language not available for this exam', fallback_language: policy.fallback }, 409);
+    if (!policy.supported.includes(lang)) lang = policy.fallback;
+    if (!lang) return json({ error: 'No public languages available' }, 404);
     const exam = await getPublishedExam(env.DB)
       .bind(lang, lang, lang, examMatch[1])
       .first();
@@ -368,7 +368,7 @@ async function api(request, env) {
   ORDER BY t.sort_order
 `).bind(lang, lang, exam.id).all();
 
-    return json({ exam, topics: topics.results || [], supported_languages: policy.supported, default_language: policy.fallback });
+    return json({ exam, topics: topics.results || [], supported_languages: policy.supported, default_language: policy.fallback, question_language: lang });
   }
 
   const questionsMatch = path.match(/^\/api\/exams\/([a-z0-9-]+)\/questions$/);
@@ -497,16 +497,18 @@ async function api(request, env) {
 
     if (!exam) return json({ error: "Exam not found." }, 404);
     const policy = await examLanguagePolicy(env.DB, slug);
-    if (!policy.supported.includes(lang)) return json({ error: 'Language not available for this exam', fallback_language: policy.fallback }, 409);
+    if (!policy?.supported.includes(lang)) lang = policy?.fallback;
+    if (!lang) return json({ error: 'No public languages available' }, 404);
 
     // Randomly select questions.
     const selected = await env.DB.prepare(`
-    SELECT id
-    FROM questions
-    WHERE exam_id = ? AND status = 'published'
+    SELECT q.id
+    FROM questions q
+    JOIN question_translations qt ON qt.question_id=q.id AND qt.language_code=?
+    WHERE q.exam_id = ? AND q.status = 'published'
     ORDER BY RANDOM()
     LIMIT ?
-  `).bind(exam.id, exam.question_count).all();
+  `).bind(lang, exam.id, exam.question_count).all();
 
     const ids = (selected.results || []).map(x => x.id);
 
@@ -585,6 +587,7 @@ async function api(request, env) {
 
     return json({
       attempt_id: attemptId,
+      question_language: lang,
       questions: ids
         .map(id => questionMap.get(id))
         .filter(Boolean)
@@ -705,7 +708,7 @@ async function sitemapResponse(db) {
     const lang = SITEMAP_LANGS.find(item => item.code === row.language_code);
     if (lang && /^[a-z0-9-]+$/.test(row.slug)) {
       urls.push(`${SITEMAP_ORIGIN}${lang.prefix}/${row.slug}`);
-      urls.push(`${SITEMAP_ORIGIN}${lang.prefix}/${categoryPath(row.category_slug)}`);
+      for (const categoryLang of SITEMAP_LANGS) urls.push(`${SITEMAP_ORIGIN}${categoryLang.prefix}/${categoryPath(row.category_slug)}`);
     }
   }
   const unique = [...new Set(urls)];
@@ -963,11 +966,11 @@ export default {
           if (CATEGORY_PATHS.includes(examSlug)) {
             const rows = await listCatalogExams(env.DB, routeLang);
             const relevant = rows.filter(e => categoryPath(e.category_slug) === examSlug);
-            const exams = relevant.filter(e => (e.supported_languages || '').split(',').includes(routeLang));
+            const exams = relevant.filter(e => Boolean(e.supported_languages));
             const c = categoryCopy(routeLang), i = CATEGORY_PATHS.indexOf(examSlug);
             const canonical = SEO_ORIGIN + seoPath(routeLang, examSlug);
             const metadata = seoHead({lang: routeLang, title: c.titles[i] + ' | ExamHere', description: c.descriptions[i], canonical,
-              alternates: SEO_LANGS.filter(l => relevant.some(e => (e.supported_languages || '').split(',').includes(l.code))).map(l => ({code:l.code,url:SEO_ORIGIN+seoPath(l.code,examSlug)}))});
+              alternates: SEO_LANGS.filter(() => exams.length).map(l => ({code:l.code,url:SEO_ORIGIN+seoPath(l.code,examSlug)}))});
             metadata.canonical = canonical;
             metadata.noindex = !exams.length;
             const resourceRows = await env.DB.prepare(`SELECT er.*, e.slug FROM exam_resources er JOIN exams e ON e.id=er.exam_id WHERE er.is_published=1 AND e.status='published' ORDER BY er.sort_order,er.id`).all();
@@ -979,23 +982,18 @@ export default {
             return seoHtmlResponse(await env.ASSETS.fetch(new Request(assetUrl, request)), metadata);
           }
           const policy = await examLanguagePolicy(env.DB, examSlug);
-          if (policy && !policy.supported.includes(routeLang)) {
-            if (!policy.fallback) return json({ error: 'No public languages available' }, 404);
-            const target = new URL(request.url);
-            target.pathname = languagePath(policy.fallback, examSlug);
-            target.searchParams.delete('lang');
-            return Response.redirect(target.toString(), 302);
-          }
-          const exam = await getPublishedExam(env.DB)
-            .bind(routeLang, routeLang, routeLang, examSlug)
-            .first();
+          const questionLang = policy?.supported.includes(routeLang) ? routeLang : policy?.fallback;
+          if (policy && !questionLang) return json({ error: 'No public languages available' }, 404);
+          const exam = questionLang ? await getPublishedExam(env.DB)
+            .bind(questionLang, routeLang, routeLang, examSlug)
+            .first() : null;
 
           if (exam) {
             const assetUrl = new URL(request.url);
             assetUrl.pathname = "/practice";
 
             const alternates = await seoExamAlternates(env.DB, exam.id, examSlug);
-            const canonical = SEO_ORIGIN + seoPath(routeLang, examSlug);
+            const canonical = SEO_ORIGIN + seoPath(questionLang, examSlug);
             const metadata = seoHead({
               lang: routeLang,
               title: `${exam.title} | ExamHere`,

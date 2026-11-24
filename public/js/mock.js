@@ -1,21 +1,28 @@
 import { api, copy, getLanguage, setLanguageSelect, setHomeLinks } from "./common.js";
-const lang = getLanguage(), t = copy[lang];
-setLanguageSelect(lang);
+let lang = getLanguage(), t = copy[lang];
 setHomeLinks();
 document.documentElement.lang = lang;
 document.querySelector("#mock-heading").textContent = t.mock;
 document.querySelector("#submit-mock").textContent = t.submit;
-let attemptId = null, questions = [];
+let attemptId = null, questions = [], questionLang = lang;
 const exam = new URLSearchParams(location.search).get("exam") || "bc-class-7l";
 function trackMock(name, extra = {}) {
-  window.examhereAnalytics?.track(name, { exam_slug: exam, exam_language: lang, practice_mode: 'mock', ...extra });
+  window.examhereAnalytics?.track(name, { exam_slug: exam, exam_language: questionLang, practice_mode: 'mock', ...extra });
 }
 const status = document.querySelector("#mock-status");
 const loading = document.querySelector("#mock-loading");
 try {
+  const metadata = await api(`/api/exams/${encodeURIComponent(exam)}?lang=${encodeURIComponent(lang)}`);
   const data = await api("/api/mock/start?lang=" + encodeURIComponent(lang), {
     method: "POST", body: JSON.stringify({ exam_slug: exam })
   });
+  questionLang = data.question_language || lang;
+  lang = questionLang;
+  t = copy[lang];
+  setLanguageSelect(lang, { examLanguages: metadata.supported_languages, mock: true });
+  document.documentElement.lang = lang;
+  document.querySelector("#mock-heading").textContent = t.mock;
+  document.querySelector("#submit-mock").textContent = t.submit;
   attemptId = data.attempt_id;
   questions = data.questions;
   if (!questions.length) throw new Error(t.noQuestions);

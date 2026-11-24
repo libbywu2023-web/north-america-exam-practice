@@ -82,7 +82,7 @@ export function getHomePath() {
 
 export function setHomeLinks() {
   const homePath = getHomePath();
-  for (const link of document.querySelectorAll("#back-link, .site-header .brand, .footer-logo")) {
+  for (const link of document.querySelectorAll("#back-link, .site-header .brand, .topbar .brand, .footer-logo")) {
     link.href = homePath;
   }
 }
@@ -108,23 +108,34 @@ export async function api(path, options = {}) {
   if (!response.ok) throw new Error(data.error || `Request failed (${response.status})`);
   return data;
 }
-export function setLanguageSelect(lang) {
+export function setLanguageSelect(lang, { examLanguages, mock = false } = {}) {
   const tagline = document.querySelector(".brand-tagline");
   if (tagline) tagline.textContent = ({ en: "Global Exam Practice", fr: "Préparation aux examens", "zh-CN": "全球考试练习平台", "zh-TW": "全球考試練習平台" })[lang] || "Global Exam Practice";
   const select = document.querySelector("#language");
   if (!select) return;
 
+  if (examLanguages) {
+    for (const option of select.options) {
+      option.disabled = option.hidden = !examLanguages.includes(option.value);
+    }
+  }
   select.value = lang;
 
   // Browsers can restore a cached page while retaining the select's newer
   // form value. On history navigation, the URL is the source of truth.
   window.addEventListener("pageshow", () => {
-    select.value = getLanguage();
+    select.value = examLanguages ? lang : getLanguage();
     setHomeLinks();
   });
 
   select.addEventListener("change", () => {
     const newLang = select.value;
+    if (mock) {
+      const url = new URL(location.href);
+      url.searchParams.set("lang", newLang);
+      location.href = url.href;
+      return;
+    }
 
     // Only homepage language changes update the persistent site preference.
     const homePathname = location.pathname.toLowerCase();
