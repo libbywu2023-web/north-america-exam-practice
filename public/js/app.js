@@ -14,72 +14,72 @@ const homeCopy = {
   fr: {
     heroTitle: "Tests de préparation gratuits aux examens du monde entier",
     heroSlogan: "Pratiquez. Préparez-vous. Réussissez.",
-    heroDescription: "Préparez votre prochain examen grâce à des questions d’entraînement gratuites. Explorez les examens de conduite, les permis et d’autres ressources par pays et par région.",
+    heroDescription: "Préparez votre examen avec des questions gratuites : permis de conduire, citoyenneté, certifications professionnelles et autres examens, par pays et région.",
     searchPlaceholder: "Rechercher un examen...", searchAria: "Rechercher des examens", searchButton: "Rechercher",
-    categoryHeading: "Explorer par catégorie", categoryAll: "Tous les examens", categoryDriving: "Examens de conduite", categoryImmigration: "Immigration et citoyenneté", categoryProfessional: "Certifications professionnelles", categoryOther: "Autres examens",
+    categoryHeading: "Explorer par catégorie", categoryAll: "Tous les examens", categoryDriving: "Permis de conduire et tests théoriques", categoryImmigration: "Tests d’immigration et de citoyenneté", categoryProfessional: "Certifications et licences professionnelles", categoryOther: "Autres examens et tests de connaissances",
     footerDescription: "Des ressources gratuites de préparation aux examens pour les apprenants du monde entier.",
     about: "À propos", privacy: "Politique de confidentialité", contact: "Contact", footerNav: "Informations",
-    disclaimer: "Global Exam Practice est une ressource éducative indépendante, sans affiliation avec un gouvernement ou un organisme d’examen.",
-    copyright: "© 2026 Global Exam Practice. Tous droits réservés.",
-    brandHome: "Accueil de Global Exam Practice", pageTitle: "Global Exam Practice — Préparation gratuite aux examens",
-    metaDescription: "Tests de préparation gratuits aux examens standardisés du monde entier. Trouvez des ressources par pays et région."
+    disclaimer: "ExamHere est une ressource éducative indépendante, sans affiliation avec un gouvernement ou un organisme d’examen.",
+    copyright: "© 2026 ExamHere. Tous droits réservés.",
+    brandHome: "Accueil de ExamHere", pageTitle: "ExamHere – Tests pratiques gratuits en ligne",
+    metaDescription: "Préparez votre examen avec des questions gratuites : permis de conduire, citoyenneté, certifications professionnelles et autres examens, par pays et région."
   },
   en: {
     heroTitle: "Free Online Practice Tests for Exams Worldwide",
     heroSlogan: "Practice. Prepare. Succeed.",
-    heroDescription: "Prepare for your next exam with free online practice questions. Explore driving, licensing, and other exam preparation resources by country and region.",
+    heroDescription: "Prepare for your next exam with free online practice questions. Explore driver’s license, citizenship, professional certification and other exams by country and region.",
     searchPlaceholder: "Search for exams...",
     searchAria: "Search exams",
     searchButton: "Search",
-    categoryHeading: "Browse by Exam Category", categoryAll: "All Exams", categoryDriving: "Driving Tests", categoryImmigration: "Immigration & Citizenship", categoryProfessional: "Professional Certification", categoryOther: "Other Exams",
+    categoryHeading: "Browse by Exam Category", categoryAll: "All Exams", categoryDriving: "Driving & Driver's License Tests", categoryImmigration: "Immigration & Citizenship Tests", categoryProfessional: "Professional Certification & Licensing", categoryOther: "Other Exams & Knowledge Tests",
     footerDescription: "Free online exam practice resources for learners worldwide.",
     about: "About",
     privacy: "Privacy Policy",
     contact: "Contact",
     footerNav: "Information",
-    disclaimer: "Global Exam Practice is an independent educational resource and is not affiliated with any government agency or examination authority.",
-    copyright: "© 2026 Global Exam Practice. All rights reserved.",
-    brandHome: "Global Exam Practice Home",
-    pageTitle: "Global Exam Practice",
-    metaDescription: "Free online practice tests for standardized exams worldwide. Explore exam preparation resources by country and region."
+    disclaimer: "ExamHere is an independent educational resource and is not affiliated with any government agency or examination authority.",
+    copyright: "© 2026 ExamHere. All rights reserved.",
+    brandHome: "ExamHere Home",
+    pageTitle: "ExamHere – Free Online Practice Tests Worldwide",
+    metaDescription: "Prepare for your next exam with free online practice questions. Explore driver’s license, citizenship, professional certification and other exams by country and region."
   },
   "zh-CN": {
     heroTitle: "全球免费在线考试练习",
     heroSlogan: "练习 · 准备 · 成功",
-    heroDescription: "通过免费的在线练习题，为下一场考试做好准备。按照国家和地区，查找驾考、执照考试及其他考试备考资源。",
+    heroDescription: "通过免费在线练习题准备驾照笔试、入籍考试、职业资格及其他考试，按国家和地区查找备考资源。",
     searchPlaceholder: "搜索考试...",
     searchAria: "搜索考试",
     searchButton: "搜索",
-    categoryHeading: "按考试类别浏览", categoryAll: "全部考试", categoryDriving: "驾驶考试", categoryImmigration: "移民与入籍", categoryProfessional: "职业资格认证", categoryOther: "其他考试",
+    categoryHeading: "按考试类别浏览", categoryAll: "全部考试", categoryDriving: "驾照考试与驾考模拟题", categoryImmigration: "移民与入籍考试", categoryProfessional: "职业资格与执照考试", categoryOther: "其他考试与知识测试",
     footerDescription: "为全球学习者提供免费的在线考试练习资源。",
     about: "关于我们",
     privacy: "隐私政策",
     contact: "联系我们",
     footerNav: "信息",
-    disclaimer: "Global Exam Practice 是一个独立的教育资源平台，与任何政府机构或考试管理机构均无关联。",
-    copyright: "© 2026 Global Exam Practice。保留所有权利。",
-    brandHome: "Global Exam Practice 首页",
-    pageTitle: "Global Exam Practice - 全球免费在线考试练习",
-    metaDescription: "为全球标准化考试提供免费在线练习题。按照国家和地区查找考试备考资源。"
+    disclaimer: "ExamHere 是一个独立的教育资源平台，与任何政府机构或考试管理机构均无关联。",
+    copyright: "© 2026 ExamHere。保留所有权利。",
+    brandHome: "ExamHere 首页",
+    pageTitle: "ExamHere – 全球免费在线考试练习",
+    metaDescription: "通过免费在线练习题准备驾照笔试、入籍考试、职业资格及其他考试，按国家和地区查找备考资源。"
   },
   "zh-TW": {
     heroTitle: "全球免費線上考試練習",
     heroSlogan: "練習 · 準備 · 成功",
-    heroDescription: "透過免費的線上練習題，為下一場考試做好準備。依照國家和地區，查找駕駛、執照及其他考試的備考資源。",
+    heroDescription: "透過免費線上練習題準備駕照筆試、入籍考試、職業資格及其他考試，依國家和地區查找備考資源。",
     searchPlaceholder: "搜尋考試...",
     searchAria: "搜尋考試",
     searchButton: "搜尋",
-    categoryHeading: "依考試類別瀏覽", categoryAll: "全部考試", categoryDriving: "駕駛考試", categoryImmigration: "移民與入籍", categoryProfessional: "職業資格認證", categoryOther: "其他考試",
+    categoryHeading: "依考試類別瀏覽", categoryAll: "全部考試", categoryDriving: "駕照考試與駕考模擬題", categoryImmigration: "移民與入籍考試", categoryProfessional: "職業資格與執照考試", categoryOther: "其他考試與知識測驗",
     footerDescription: "為全球學習者提供免費的線上考試練習資源。",
     about: "關於我們",
     privacy: "隱私權政策",
     contact: "聯絡我們",
     footerNav: "資訊",
-    disclaimer: "Global Exam Practice 是獨立的教育資源平台，與任何政府機關或考試管理機構均無關聯。",
-    copyright: "© 2026 Global Exam Practice。保留所有權利。",
-    brandHome: "Global Exam Practice 首頁",
-    pageTitle: "Global Exam Practice - 全球免費線上考試練習",
-    metaDescription: "為全球標準化考試提供免費線上練習題。依照國家和地區查找考試備考資源。"
+    disclaimer: "ExamHere 是獨立的教育資源平台，與任何政府機關或考試管理機構均無關聯。",
+    copyright: "© 2026 ExamHere。保留所有權利。",
+    brandHome: "ExamHere 首頁",
+    pageTitle: "ExamHere – 全球免費線上考試練習",
+    metaDescription: "透過免費線上練習題準備駕照筆試、入籍考試、職業資格及其他考試，依國家和地區查找備考資源。"
   }
 };
 
@@ -90,10 +90,10 @@ Object.assign(homeCopy["zh-CN"], {"categoryHeading": "按考试类别浏览免�
 Object.assign(homeCopy["zh-TW"], {"categoryHeading": "依考試類別瀏覽免費練習題", "categoryIntro": "探索駕照筆試、入籍考試、職業資格認證及其他標準化考試。選擇類別，依國家和地區篩選已上線的練習題。", "showAll": "顯示全部考試類別", "countryHeading": "依國家瀏覽考試練習", "countryIntro": "依國家、省份和州尋找免費練習題，選擇考試開始準備。", "popularHeading": "熱門考試練習", "popularIntro": "選擇已發布的考試，依照自己的步調練習。", "preparationHeading": "如何準備考試", "prep1Title": "了解考試形式", "prep1Text": "先查看官方考試題型、時間限制、及格分數和考試範圍。", "prep2Title": "透過練習題準備", "prep2Text": "使用線上練習題熟悉知識點和考試題型。", "prep3Title": "複習並進步", "prep3Text": "查看答案與解析，找出薄弱環節並重複練習。", "faqHeading": "常見問題", "faq1q": "練習題免費嗎？", "faq1a": "是的，網站提供的線上練習題可以免費使用。", "faq2q": "需要註冊帳號嗎？", "faq2a": "不需要註冊帳號即可開始練習。", "faq3q": "這些是官方考試原題嗎？", "faq3a": "不是。這些是獨立的學習資源，並非官方考試題目。最新考試要求請以主管機關公布的資訊為準。", "faq4q": "目前可以練習哪些考試？", "faq4a": "請查看上方國家目錄，了解已上線的駕考和入籍考試練習。其他類別將陸續增加。", "faq5q": "支援哪些語言？", "faq5a": "網站支援英語、法語、簡體中文和繁體中文；各考試可用語言可能不同。"});
 Object.assign(homeCopy["fr"], {"categoryHeading": "Explorer les tests gratuits par catégorie", "categoryIntro": "Découvrez les examens de conduite, de citoyenneté, les certifications professionnelles et autres tests. Sélectionnez une catégorie pour filtrer les examens disponibles.", "showAll": "Afficher toutes les catégories", "countryHeading": "Explorer les examens par pays", "countryIntro": "Trouvez des tests gratuits par pays et région. Sélectionnez un examen pour commencer.", "popularHeading": "Tests populaires", "popularIntro": "Choisissez un test disponible et entraînez-vous à votre rythme.", "preparationHeading": "Comment préparer votre examen", "prep1Title": "Connaître le format", "prep1Text": "Consultez le format officiel, la durée, le seuil de réussite et les sujets abordés.", "prep2Title": "S’entraîner avec des questions", "prep2Text": "Utilisez des questions en ligne pour vous familiariser avec les sujets et les types de questions.", "prep3Title": "Réviser et progresser", "prep3Text": "Vérifiez les réponses et les explications, puis travaillez vos points faibles.", "faqHeading": "Questions fréquentes", "faq1q": "Les tests sont-ils gratuits ?", "faq1a": "Oui. Les questions d’entraînement disponibles sont gratuites.", "faq2q": "Dois-je créer un compte ?", "faq2a": "Non, aucun compte n’est nécessaire pour commencer.", "faq3q": "S’agit-il de questions officielles ?", "faq3a": "Non. Ce sont des ressources pédagogiques indépendantes et non des questions officielles. Consultez les autorités compétentes pour les exigences actuelles.", "faq4q": "Quels examens sont disponibles ?", "faq4a": "Consultez la liste par pays ci-dessus pour voir les tests de conduite et de citoyenneté disponibles.", "faq5q": "Quelles langues sont proposées ?", "faq5a": "Le site propose l’anglais, le français, le chinois simplifié et le chinois traditionnel. Les langues disponibles varient selon l’examen."});
 const benefitCopy = {
-  fr: ["Tests gratuits", "Sans inscription", "Plusieurs langues", "Anglais · Français · 中文", "Plusieurs types d’examens", "Conduite · Citoyenneté · Certifications", "Étudiez à tout moment", "Sur ordinateur, tablette ou mobile"],
   en: ["Free Practice Tests", "No registration required", "Multilingual Support", "English · Français · 中文", "Multiple Exam Types", "Driving · Citizenship · Certification", "Study Anytime", "On desktop, tablet or mobile"],
-  "zh-CN": ["免费考试练习", "无需注册", "多语言支持", "英语 · 法语 · 简体中文 · 繁体中文", "多种考试类型", "驾考 · 入籍 · 职业认证", "随时学习", "支持电脑、平板和手机"],
-  "zh-TW": ["免費考試練習", "無需註冊", "多語言支援", "英語 · 法語 · 簡體中文 · 繁體中文", "多種考試類型", "駕考 · 入籍 · 職業認證", "隨時學習", "支援電腦、平板和手機"]
+  "zh-CN": ["免费练习题", "无需注册", "多语言支持", "英语 · 法语 · 中文", "多种考试类型", "驾考 · 入籍 · 职业资格", "随时学习", "支持电脑、平板和手机"],
+  "zh-TW": ["免費練習題", "無需註冊", "多語言支援", "英語 · 法語 · 中文", "多種考試類型", "駕考 · 入籍 · 職業資格", "隨時學習", "支援電腦、平板和手機"],
+  fr: ["Tests gratuits", "Sans inscription", "Plusieurs langues", "English · Français · 中文", "Divers types d’examens", "Conduite · Citoyenneté · Certification", "Étudiez à tout moment", "Sur ordinateur, tablette ou mobile"]
 };
 for (const [language, values] of Object.entries(benefitCopy)) {
   Object.assign(homeCopy[language], Object.fromEntries(
@@ -137,10 +137,10 @@ function decorateStaticHomeIcons() {
 decorateStaticHomeIcons();
 
 const categoryDescriptions = {
-  en: ["Prepare for learner’s permit, G1, Class 7L and CDL knowledge tests. Study road signs, traffic rules and safe driving.","Study citizenship knowledge, including history, government, civic rights and responsibilities.","Explore licensing, workplace safety and professional qualification exam preparation.","Discover food safety, health-related and other knowledge-based exam resources."],
-  fr: ["Préparez les examens du permis de conduire, G1, Class 7L et CDL : panneaux, circulation et sécurité.","Révisez l’histoire, le gouvernement, les droits et les responsabilités civiques.","Explorez les examens de certification, de sécurité au travail et de qualification professionnelle.","Découvrez les examens de sécurité alimentaire, de santé et d’autres domaines."],
-  "zh-CN": ["准备学习驾照、G1、Class 7L 和 CDL 理论考试，练习交通标志、道路规则与安全驾驶。","学习入籍考试中的历史、政府、公民权利和责任等知识。","探索职业执照、工作场所安全及职业资格认证考试。","查找食品安全、健康及其他知识类考试资源。"],
-  "zh-TW": ["準備學習駕照、G1、Class 7L 和 CDL 筆試，練習交通標誌、道路規則與安全駕駛。","學習入籍考試中的歷史、政府、公民權利和責任等知識。","探索職業執照、工作場所安全及職業資格認證考試。","尋找食品安全、健康及其他知識類考試資源。"]
+  fr: ["Préparez le permis de conduire, les tests théoriques G1, ICBC et CDL : signalisation et sécurité routière.", "Préparez les tests de citoyenneté : histoire, gouvernement, droits et responsabilités civiques.", "Explorez les examens de certification, de permis professionnels et de sécurité au travail.", "Découvrez les tests de permis de navigation, de sécurité alimentaire et autres examens de connaissances."],
+  en: ["Free driver's license and driving licence practice tests, including learner’s permit, G1, ICBC and CDL knowledge tests. Study road signs and road rules.", "Prepare for citizenship and naturalization tests. Study history, government, civic rights and responsibilities.", "Explore professional certification, occupational licensing and workplace safety exams.", "Explore boating licence, food safety and other knowledge-based practice tests."],
+  "zh-CN": ["免费驾照笔试模拟题，涵盖学习驾照、G1、ICBC、CDL 等理论考试，练习交通标志和道路规则。", "准备入籍考试，学习历史、政府、公民权利与责任。", "探索职业资格认证、职业执照及工作场所安全考试。", "探索船舶驾照、食品安全及其他知识类考试练习。"],
+  "zh-TW": ["免費駕照筆試模擬題，涵蓋學習駕照、G1、ICBC、CDL 等理論考試，練習交通標誌與道路規則。", "準備入籍考試，學習歷史、政府、公民權利與責任。", "探索職業資格認證、職業執照及工作場所安全考試。", "探索船舶駕照、食品安全及其他知識類考試練習。"]
 };
 function applyHomeTranslations() {
   const translations = homeCopy[lang] || homeCopy.en;

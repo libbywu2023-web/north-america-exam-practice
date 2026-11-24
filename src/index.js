@@ -727,10 +727,10 @@ const SEO_LANGS = [
   { code: "zh-TW", prefix: "/zh-tw", hreflang: "zh-TW" }
 ];
 const SEO_HOME = {
-  en: ["Global Exam Practice - Free Online Practice Tests", "Free online practice tests for exams worldwide. Find driving, citizenship and other exam preparation resources."],
-  fr: ["Global Exam Practice - Tests pratiques gratuits", "Préparez vos examens avec des questions gratuites en ligne, notamment pour la conduite et la citoyenneté."],
-  "zh-CN": ["Global Exam Practice - 全球免费在线考试练习", "提供全球驾照、入籍及其他考试的免费在线练习题，按国家和地区查找备考资源。"],
-  "zh-TW": ["Global Exam Practice - 全球免費線上考試練習", "提供全球駕照、入籍及其他考試的免費線上練習題，依國家和地區查找備考資源。"]
+  en: ["ExamHere – Free Online Practice Tests Worldwide", "Prepare for your next exam with free online practice questions. Explore driver’s license, citizenship, professional certification and other exams by country and region."],
+  fr: ["ExamHere – Tests pratiques gratuits en ligne", "Préparez votre examen avec des questions gratuites : permis de conduire, citoyenneté, certifications professionnelles et autres examens, par pays et région."],
+  "zh-CN": ["ExamHere – 全球免费在线考试练习", "通过免费在线练习题准备驾照笔试、入籍考试、职业资格及其他考试，按国家和地区查找备考资源。"],
+  "zh-TW": ["ExamHere – 全球免費線上考試練習", "透過免費線上練習題準備駕照筆試、入籍考試、職業資格及其他考試，依國家和地區查找備考資源。"]
 };
 function seoEscape(value) {
   return String(value ?? "").replace(/[&<>"']/g, ch => ({
@@ -763,7 +763,12 @@ async function seoHtmlResponse(response, metadata, examTitle = "", examDescripti
   html = html.replace(/<meta property="og:url" content="[^"]*">/i, "");
   html = html.replace(/<meta property="og:title" content="[^"]*">/i, "");
   html = html.replace(/<meta property="og:description" content="[^"]*">/i, "");
+  html = html.replace(/<meta property="og:site_name" content="[^"]*">/i, "");
+  const websiteSchema = metadata.canonical === SEO_ORIGIN + "/"
+    ? `<script type="application/ld+json">${JSON.stringify({ "@context": "https://schema.org", "@type": "WebSite", name: "ExamHere", alternateName: "Global Exam Practice", url: SEO_ORIGIN + "/" })}</script>` : "";
   html = html.replace("</head>", `${metadata.links}
+<meta property="og:site_name" content="ExamHere">
+${websiteSchema}
 <meta property="og:title" content="${metadata.title}">
 <meta property="og:description" content="${metadata.description}">
 <meta property="og:url" content="${seoEscape(metadata.canonical)}">
@@ -959,8 +964,8 @@ export default {
             const canonical = SEO_ORIGIN + seoPath(routeLang, examSlug);
             const metadata = seoHead({
               lang: routeLang,
-              title: `${exam.title} | Exam Practice`,
-              description: exam.description || `${exam.title} practice questions on Exam Practice.`,
+              title: `${exam.title} | ExamHere`,
+              description: exam.description || `${exam.title} practice questions on ExamHere.`,
               canonical,
               alternates: alternates.map(item => ({ ...item, code: item.code }))
             });

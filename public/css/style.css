@@ -459,8 +459,8 @@ body:has(#catalog) .brand {
 }
 
 body:has(#catalog) .brand-icon {
-  width: 23px;
-  height: 23px;
+  width: 42px;
+  height: 42px;
   flex-shrink: 0;
 }
 
@@ -1825,3 +1825,29 @@ body:has(.practice-page-head) .practice-bottom-actions button:disabled { opacity
   .homepage .category-filter { min-height:0; }
   .homepage .catalog-filter-status { align-items:flex-start; }
 }
+
+/* ExamHere brand lockup */
+.brand-lockup { display:flex; flex-direction:column; min-width:0; line-height:1.12; }
+.brand-name { font-size:25px; font-weight:750; color:#123661; white-space:nowrap; }
+.brand-here { color:#176bc4; }
+.brand-tagline { font-size:11px; font-weight:500; color:#526983; line-height:1.3; }
+@media(max-width:600px) { .brand-name { font-size:20px; } .brand-tagline { font-size:10px; } .brand { gap:6px; } }
+
+/* Match the practice header icon on small screens. */
+@media (max-width: 600px) {
+  body:has(#catalog) .brand-icon { width: 32px; height: 32px; }
+}
+
+/* Homepage platform benefits: consistent SVG badges and aligned copy. */
+.homepage .home-benefits { gap:16px; margin-top:24px; }
+.homepage .home-benefits > div { display:grid; grid-template-columns:48px minmax(0,1fr); column-gap:12px; row-gap:4px; align-content:start; position:relative; padding:8px 10px 8px 0; }
+.homepage .home-benefits strong { display:contents; }
+.homepage .home-benefits strong > span:not(.benefit-icon) { grid-column:2; align-self:end; font-size:14px; line-height:1.35; }
+.homepage .benefit-icon { grid-column:1; grid-row:1 / span 2; width:48px; height:48px; border-radius:13px; background:#d4e8ff; color:#1269c5; }
+.homepage .benefit-icon svg { width:29px; height:29px; }
+.homepage .home-benefits > div:nth-child(2) .benefit-icon { background:#d5f3e6; color:#008b63; }
+.homepage .home-benefits > div:nth-child(3) .benefit-icon { background:#e8dfff; color:#7044cf; }
+.homepage .home-benefits > div:nth-child(4) .benefit-icon { background:#ffedca; color:#b96900; }
+.homepage .home-benefits small { grid-column:2; padding-left:0; font-size:12px; line-height:1.4; }
+@media(min-width:951px) { .homepage .home-benefits > div:not(:last-child) { border-right:1px solid #c6d7eb; } }
+@media(max-width:600px) { .homepage .home-benefits { gap:12px 8px; } .homepage .home-benefits > div { grid-template-columns:34px minmax(0,1fr); column-gap:7px; padding:4px 0; } .homepage .benefit-icon { width:34px; height:34px; border-radius:9px; } .homepage .benefit-icon svg { width:22px; height:22px; } .homepage .home-benefits strong > span:not(.benefit-icon) { font-size:12px; } .homepage .home-benefits small { font-size:11px; } }

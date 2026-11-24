@@ -109,6 +109,8 @@ export async function api(path, options = {}) {
   return data;
 }
 export function setLanguageSelect(lang) {
+  const tagline = document.querySelector(".brand-tagline");
+  if (tagline) tagline.textContent = ({ en: "Global Exam Practice", fr: "Préparation aux examens", "zh-CN": "全球考试练习平台", "zh-TW": "全球考試練習平台" })[lang] || "Global Exam Practice";
   const select = document.querySelector("#language");
   if (!select) return;
 

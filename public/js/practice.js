@@ -51,9 +51,9 @@ function renderExamRegion(examInfo) {
 }
 
 function updateSeo(examInfo) {
-  const title = `${examInfo.title} | Exam Practice`;
+  const title = `${examInfo.title} | ExamHere`;
   const description = examInfo.description ||
-    `${examInfo.title} practice questions on Exam Practice.`;
+    `${examInfo.title} practice questions on ExamHere.`;
 
   const canonicalPath =
     lang === "fr"
