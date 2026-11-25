@@ -1,4 +1,4 @@
-import { homeCopy, homeIconPaths, categoryDescriptions, labels, getCountryFlag, categoryDefinitions, matchesCategory } from "./home-shared.js";
+import { homeCopy, homeIconPaths, categoryDescriptions, labels, getCountryFlag, categoryDefinitions, matchesCategory, categoryCount } from "./home-shared.js";
 import {
   api,
   getLanguage,
@@ -91,8 +91,9 @@ function renderCategories() {
     const symbol = homeIcon(["car", "id", "briefcase", "grid"][index], "category-symbol");
     const heading = createElement("strong", "category-name", copy[category.label]);
     const description = createElement("span", "category-description", descriptions[index]);
-    const action = createElement("span", "category-action", count ? `${copy[category.label]} (${count}) →` : `${copy[category.label]} →`);
-    button.append(symbol, heading, description, action);
+    const action = createElement("span", "category-action", copy.viewExams);
+    const total = createElement("span", "category-count", categoryCount(lang, count));
+    button.append(symbol, total, heading, description, action);
     categoryRoot.append(button);
   });
 }

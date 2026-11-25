@@ -1,4 +1,4 @@
-import { homeCopy, homeIconPaths, categoryDescriptions, labels, getCountryFlag, categoryDefinitions, matchesCategory } from '../public/js/home-shared.js';
+import { homeCopy, homeIconPaths, categoryDescriptions, labels, getCountryFlag, categoryDefinitions, matchesCategory, categoryCount } from '../public/js/home-shared.js';
 
 // Same catalog and presentation classes as the interactive homepage.
 export function renderHome(html, lang, exams, path, escape) {
@@ -7,7 +7,7 @@ export function renderHome(html, lang, exams, path, escape) {
   const link = e => `<a class="catalog-exam-link" href="${escape(path(lang, encodeURIComponent(e.slug)))}">${escape(e.title)}${Number(e.show_new_badge) === 1 ? '&nbsp;<span class="catalog-new-badge">NEW</span>' : ''}</a>`;
   const categories = categoryDefinitions.slice(1).map((c,i) => {
     const count = exams.filter(e => matchesCategory(e,c.slug)).length;
-    return `<a class="category-filter" href="${path(lang,['driving-tests','citizenship-tests','professional-certification','other-exams'][i])}" data-category="${c.slug}">${icon(['car','id','briefcase','grid'][i],'category-symbol')}<strong class="category-name">${escape(copy[c.label])}</strong><span class="category-description">${escape(categoryDescriptions[lang][i])}</span><span class="category-action">${escape(copy[c.label])}${count ? ` (${count})` : ''} →</span></a>`;
+    return `<a class="category-filter" href="${path(lang,['driving-tests','citizenship-tests','professional-certification','other-exams'][i])}" data-category="${c.slug}">${icon(['car','id','briefcase','grid'][i],'category-symbol')}<span class="category-count">${escape(categoryCount(lang,count))}</span><strong class="category-name">${escape(copy[c.label])}</strong><span class="category-description">${escape(categoryDescriptions[lang][i])}</span><span class="category-action">${escape(copy.viewExams)}</span></a>`;
   }).join('');
   const countries = new Map();
   for (const e of exams) {

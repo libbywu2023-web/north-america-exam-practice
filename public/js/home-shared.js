@@ -189,4 +189,18 @@ function matchesCategory(exam, slug) {
   return exam.category_slug === slug;
 }
 
+const browseCopy = {
+  en: ['Start Practicing', 'Choose Your Exam Category', 'Select a category below to find your exam and start practicing for free.', 'View Exams', 'exam', 'exams'],
+  fr: ['Commencer à s’entraîner', 'Choisissez votre catégorie d’examen', 'Sélectionnez une catégorie pour trouver votre examen et vous entraîner gratuitement.', 'Voir les examens', 'examen', 'examens'],
+  'zh-CN': ['开始练习', '选择考试类别', '选择下方的考试类别，找到你的考试并开始免费练习。', '查看考试', '项考试', '项考试'],
+  'zh-TW': ['開始練習', '選擇考試類別', '選擇下方的考試類別，找到你的考試並開始免費練習。', '查看考試', '項考試', '項考試']
+};
+for (const [language, [start, heading, intro, view]] of Object.entries(browseCopy)) {
+  Object.assign(homeCopy[language], {startPracticing: start + ' ↓', categoryHeading: heading, categoryIntro: intro, viewExams: view + ' →'});
+}
+export function categoryCount(lang, count) {
+  const c = browseCopy[lang] || browseCopy.en;
+  return `${count} ${c[count === 1 ? 4 : 5]}`;
+}
+
 export { homeCopy, homeIconPaths, categoryDescriptions, labels, getCountryFlag, categoryDefinitions, matchesCategory };

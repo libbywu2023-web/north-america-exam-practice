@@ -31,6 +31,12 @@
     window.gtag('event', name, parameters);
   }
   window.examhereAnalytics = Object.freeze({ track });
+  document.addEventListener('click', event => {
+    const link = event.target.closest?.('a[data-browse-cta], a.category-filter[data-category]');
+    if (!link) return;
+    if (link.dataset.browseCta) track('start_practicing_click', { page_section: link.dataset.browseCta });
+    else track('exam_category_click', { exam_category: link.dataset.category });
+  });
   function loadAnalytics() {
     if (loaded) return;
     loaded = true;
