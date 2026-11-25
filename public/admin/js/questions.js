@@ -522,9 +522,10 @@ async function deleteQuestion(id) {
   if (!confirm(`Delete this question?\n\n${title}`)) return;
 
   try {
-    await apiRequest(`${API_URL}/${id}`, { method: "DELETE" });
+    const result = await apiRequest(`${API_URL}/${id}`, { method: "DELETE" });
     await loadQuestions();
-    showMessage("Question deleted successfully.", "success");
+    showMessage(result.warning || result.message || "Question deleted successfully.",
+      result.warning ? "error" : "success");
   } catch (error) {
     showMessage(error.message, "error");
   }

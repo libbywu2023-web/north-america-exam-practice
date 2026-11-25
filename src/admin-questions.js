@@ -1023,8 +1023,10 @@ async function deleteQuestion(id, env) {
   const usage = await env.DB.prepare(`
     SELECT COUNT(*) AS total
     FROM attempt_questions
-    WHERE question_id = ?
-  `).bind(id).first();
+    WHERE question_id = ? OR selected_option_id IN (
+      SELECT id FROM question_options WHERE question_id = ?
+    )
+  `).bind(id, id).first();
 
   if (Number(usage?.total || 0) > 0) {
     return jsonResponse({
@@ -1032,30 +1034,85 @@ async function deleteQuestion(id, env) {
     }, 409);
   }
 
+  let imageKeys = [];
   try {
+    // Published staging images share the same R2 objects as live questions.
+    const images = await env.DB.prepare(`
+      SELECT image_url AS url FROM question_images WHERE question_id = ?
+      UNION
+      SELECT '/images/' || si.r2_key AS url
+      FROM staging_question_images si
+      JOIN questions_staging qs ON qs.id = si.staging_question_id
+      WHERE qs.published_question_id = ? AND qs.status = 'published'
+    `).bind(id, id).all();
+    imageKeys = [...new Set((images.results || [])
+      .map(row => row.url)
+      .filter(url => /^\/images\/questions\/[a-f0-9-]+\.(jpg|png|webp)$/i.test(url))
+      .map(url => url.slice('/images/'.length)))];
+
     await env.DB.batch([
+      // Keep the import history read-only, but remove its image attachments.
       env.DB.prepare(`
-        DELETE FROM questions
-        WHERE id = ?
+        DELETE FROM staging_question_images
+        WHERE staging_question_id IN (
+          SELECT id FROM questions_staging
+          WHERE published_question_id = ? AND status = 'published'
+        )
+      `).bind(id),
+      env.DB.prepare(`
+        UPDATE questions_staging SET published_question_id = NULL
+        WHERE published_question_id = ?
+      `).bind(id),
+      env.DB.prepare(`
+        DELETE FROM questions WHERE id = ?
       `).bind(id),
       env.DB.prepare(`
         INSERT INTO admin_audit_logs (
           actor, action, entity_type, entity_id, details_json
         )
         VALUES ('admin', 'delete', 'question', ?, ?)
-      `).bind(String(id), JSON.stringify({ previous_status: existing.status }))
+      `).bind(String(id), JSON.stringify({ previous_status: existing.status, image_cleanup_candidates: imageKeys }))
     ]);
-
-    return jsonResponse({
-      success: true,
-      message: "Question deleted successfully."
-    });
   } catch (error) {
     console.error("Delete question error:", error);
+    const foreignKey = /FOREIGN KEY/i.test(String(error));
     return jsonResponse({
-      error: "Unable to delete question."
-    }, 409);
+      error: foreignKey
+        ? "Unable to delete question: a database reference still exists. Please archive it or check server logs."
+        : "Unable to delete question. Check server logs."
+    }, foreignKey ? 409 : 500);
   }
+
+  // R2 is not part of the D1 transaction. Never delete objects before commit.
+  const failedKeys = [];
+  for (const key of imageKeys) {
+    try {
+      const reference = await env.DB.prepare(`
+        SELECT EXISTS(SELECT 1 FROM question_images WHERE image_url = ?)
+          OR EXISTS(SELECT 1 FROM staging_question_images WHERE r2_key = ?) AS used
+      `).bind(`/images/${key}`, key).first();
+      if (!reference || Number(reference.used) !== 0) continue;
+      await env.exam_question_images.delete(key);
+    } catch (error) {
+      failedKeys.push(key);
+      console.error("Question image cleanup failed:", id, key, error);
+    }
+  }
+  if (failedKeys.length) {
+    try {
+      await env.DB.prepare(`
+        INSERT INTO admin_audit_logs (actor, action, entity_type, entity_id, details_json)
+        VALUES ('admin', 'image_cleanup_failed', 'question', ?, ?)
+      `).bind(String(id), JSON.stringify({ r2_keys: failedKeys })).run();
+    } catch (error) {
+      console.error("Image cleanup audit failed:", id, failedKeys, error);
+    }
+  }
+  return jsonResponse({
+    success: true,
+    message: "Question deleted successfully.",
+    warning: failedKeys.length ? "Question deleted, but some image files could not be cleaned up. Check server logs before retrying cleanup." : null
+  });
 }
 
 export async function handleAdminQuestions(request, env) {
