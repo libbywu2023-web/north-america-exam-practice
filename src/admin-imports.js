@@ -514,16 +514,22 @@ async function importQuestions(request, env) {
   }
 
   // Check existing formal questions. Existing IDs are skipped, never overwritten.
-  const existingResult = await db.prepare(`
-    SELECT external_question_id
-    FROM questions
-    WHERE exam_id = ?
-      AND external_question_id IS NOT NULL
-  `).bind(exam.id).all();
+  const existingIds = new Set();
+  if (topicValidRecords.length) {
+    const existingResult = await db.prepare(`
+      SELECT external_question_id
+      FROM questions
+      WHERE exam_id = ?
+        AND external_question_id IN (SELECT value FROM json_each(?))
+    `).bind(
+      exam.id,
+      JSON.stringify(topicValidRecords.map((record) => record.externalQuestionId))
+    ).all();
 
-  const existingIds = new Set(
-    (existingResult.results || []).map((row) => row.external_question_id)
-  );
+    for (const row of existingResult.results || []) {
+      existingIds.add(row.external_question_id);
+    }
+  }
 
   const newRecords = [];
 
