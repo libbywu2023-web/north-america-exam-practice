@@ -1,3 +1,4 @@
+import { profileD1 } from "./d1-profile.js";
 import { renderHome } from "./home-page.js";
 import { CATEGORY_PATHS, categoryPath, categoryCopy, categoryLinks, categoryBody } from "./category-pages.js";
 import { handleAdminAuth } from "./admin-auth.js";
@@ -826,6 +827,9 @@ async function seoExamAlternates(db, examId, slug) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    const profile = env.D1_PROFILE === "1" && env.DB && url.pathname.startsWith("/api/admin/") ? profileD1(env.DB) : null;
+    const started = Date.now();
+    if (profile) env = { ...env, DB: profile.db };
     try {
       if (request.method === "GET" && url.pathname === "/sitemap.xml") {
         if (!env.DB) return new Response("Database unavailable", { status: 503 });
@@ -1032,6 +1036,9 @@ export default {
     } catch (error) {
       console.error("Request failed", error);
       return json({ error: "Internal server error." }, 500);
+    } finally {
+      if (profile) console.log(JSON.stringify({ event: "admin_d1_profile", method: request.method,
+        route: url.pathname.replace(/\/\d+(?=\/|$)/g, "/:id"), duration_ms: Date.now() - started, ...profile.summary() }));
     }
   }
 };
