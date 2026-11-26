@@ -16,7 +16,8 @@ import { handleAdminReview } from "./admin-review.js";
 
 const JSON_HEADERS = {
   "content-type": "application/json; charset=utf-8",
-  "cache-control": "no-store"
+  "cache-control": "no-store",
+  "x-robots-tag": "noindex"
 };
 
 function json(data, status = 200) {
@@ -846,7 +847,7 @@ export default {
         const region = !country || country === "XX" || country === "T1"
           ? "unknown" : consentCountries.has(country) ? "opt-in" : "notice";
         return new Response(JSON.stringify({ region }), {
-          headers: { "content-type": "application/json; charset=utf-8", "cache-control": "private, no-store" }
+          headers: { "content-type": "application/json; charset=utf-8", "cache-control": "private, no-store", "x-robots-tag": "noindex" }
         });
       }
       if (url.pathname.startsWith("/api/admin/languages")) {

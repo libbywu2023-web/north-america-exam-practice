@@ -1,5 +1,9 @@
 User-agent: *
 Disallow: /admin/
-Disallow: /api/
+Disallow: /api/admin/
+Disallow: /api/history
+Disallow: /api/mock/
+Disallow: /api/questions/*/answer
+Disallow: /api/health
 
 Sitemap: https://examhere.com/sitemap.xml
