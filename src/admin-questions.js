@@ -515,15 +515,57 @@ async function validateRelations(env, examId, topicId) {
   return {};
 }
 
-async function listQuestions(env) {
+async function listQuestions(env, url) {
+  const params = url.searchParams;
+  const requestedSize = Number(params.get("page_size"));
+  const pageSize = [25, 50, 100].includes(requestedSize) ? requestedSize : 50;
+  const requestedPage = Number(params.get("page"));
+  const filters = [], args = [];
+  const exam = params.get("exam_id");
+  const status = params.get("status");
+  const keyword = (params.get("q") || "").trim().toLowerCase();
+  if (exam) { filters.push("q.exam_id = ?"); args.push(exam); }
+  if (status) { filters.push("q.status = ?"); args.push(status); }
+  if (keyword) {
+    filters.push(`(instr(lower(CAST(q.id AS TEXT) || ' ' ||
+      COALESCE(et.title, e.slug) || ' ' || e.slug || ' ' ||
+      COALESCE(tt.name, t.slug, '') || ' ' || COALESCE(t.slug, '') || ' ' ||
+      COALESCE((SELECT group_concat(COALESCE(qt.question_text, '') || ' ' ||
+        COALESCE(qt.explanation, ''), ' ') FROM question_translations qt
+        WHERE qt.question_id = q.id), '')), ?) > 0)`);
+    args.push(keyword);
+  }
+  const from = `FROM questions q JOIN exams e ON e.id = q.exam_id
+    LEFT JOIN exam_translations et ON et.exam_id = e.id AND et.language_code = e.default_language
+    LEFT JOIN topics t ON t.id = q.topic_id
+    LEFT JOIN topic_translations tt ON tt.topic_id = t.id AND tt.language_code = e.default_language`;
+  const where = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
+  const count = await env.DB.prepare(`SELECT COUNT(*) AS total ${from} ${where}`).bind(...args).first();
+  const total = Number(count.total);
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  const page = Math.min(pages, Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1);
+  const [result, languages, examsResult, topicsResult] = await Promise.all([
+    env.DB.prepare(`SELECT q.id, q.exam_id, q.topic_id, q.difficulty, q.status,
+      e.slug AS exam_slug, COALESCE(et.title, e.slug) AS exam_title,
+      t.slug AS topic_slug, COALESCE(tt.name, t.slug) AS topic_name,
+      COALESCE(NULLIF((SELECT question_text FROM question_translations WHERE question_id = q.id AND language_code = 'en'), ''),
+        (SELECT question_text FROM question_translations WHERE question_id = q.id ORDER BY language_code LIMIT 1), '') AS question_text,
+      (SELECT COUNT(*) FROM question_images WHERE question_id = q.id) AS image_count
+      ${from} ${where} ORDER BY q.id DESC LIMIT ? OFFSET ?`).bind(...args, pageSize, (page - 1) * pageSize).all(),
+    getEnabledLanguages(env),
+    env.DB.prepare("SELECT id, slug FROM exams ORDER BY id DESC").all(),
+    env.DB.prepare("SELECT id, exam_id, slug FROM topics ORDER BY exam_id, sort_order").all()
+  ]);
+  return jsonResponse({ questions: result.results || [], languages,
+    exams: examsResult.results || [], topics: topicsResult.results || [], total, page, page_size: pageSize, pages });
+}
+
+async function getQuestion(id, env) {
   const [
     questionResult,
     questionTranslationResult,
     optionResult,
     optionTranslationResult,
-    languages,
-    examsResult,
-    topicsResult,
     imageResult
   ] = await Promise.all([
     env.DB.prepare(`
@@ -559,8 +601,8 @@ async function listQuestions(env) {
       LEFT JOIN topic_translations tt
         ON tt.topic_id = t.id
         AND tt.language_code = e.default_language
-      ORDER BY q.id DESC
-    `).all(),
+      WHERE q.id = ?
+    `).bind(id).all(),
 
     env.DB.prepare(`
 SELECT
@@ -570,14 +612,14 @@ SELECT
   explanation,
   question_text_source,
   explanation_source
-FROM question_translations
-    `).all(),
+FROM question_translations WHERE question_id = ?
+    `).bind(id).all(),
 
     env.DB.prepare(`
       SELECT id, question_id, option_key, sort_order, is_correct
-      FROM question_options
-      ORDER BY question_id, sort_order
-    `).all(),
+      FROM question_options WHERE question_id = ?
+      ORDER BY sort_order
+    `).bind(id).all(),
 
     env.DB.prepare(`
      SELECT
@@ -585,28 +627,14 @@ FROM question_translations
   language_code,
   option_text,
   translation_source
-FROM option_translations
-    `).all(),
-
-    getEnabledLanguages(env),
-
-    env.DB.prepare(`
-      SELECT id, slug
-      FROM exams
-      ORDER BY id DESC
-    `).all(),
-
-    env.DB.prepare(`
-      SELECT id, exam_id, slug
-      FROM topics
-      ORDER BY exam_id, sort_order
-    `).all(),
+FROM option_translations WHERE option_id IN (SELECT id FROM question_options WHERE question_id = ?)
+    `).bind(id).all(),
 
     env.DB.prepare(`
       SELECT question_id, image_url, alt_text, sort_order
-      FROM question_images
-      ORDER BY question_id, sort_order
-    `).all()
+      FROM question_images WHERE question_id = ?
+      ORDER BY sort_order
+    `).bind(id).all()
   ]);
 
   const imagesByQuestion = {};
@@ -659,12 +687,8 @@ FROM option_translations
     images: imagesByQuestion[row.id] || []
   }));
 
-  return jsonResponse({
-    questions,
-    languages,
-    exams: examsResult.results || [],
-    topics: topicsResult.results || []
-  });
+  return questions.length ? jsonResponse({ question: questions[0] })
+    : jsonResponse({ error: "Question not found." }, 404);
 }
 
 async function saveQuestion(id, request, env) {
@@ -1125,7 +1149,7 @@ export async function handleAdminQuestions(request, env) {
 
   if (url.pathname === API_PATH) {
     if (method === "GET") {
-      return listQuestions(env);
+      return listQuestions(env, url);
     }
 
     if (method === "POST") {
@@ -1141,6 +1165,8 @@ export async function handleAdminQuestions(request, env) {
 
   if (match) {
     const id = Number(match[1]);
+
+    if (method === "GET") return getQuestion(id, env);
 
     if (method === "PUT") {
       return saveQuestion(id, request, env);

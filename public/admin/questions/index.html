@@ -143,6 +143,13 @@
         </div>
       </section>
 
+      <div class="table-actions" style="margin:12px 0;align-items:center;flex-wrap:wrap">
+        <label for="question-page-size">Questions per page</label>
+        <select id="question-page-size"><option>25</option><option selected>50</option><option>100</option></select>
+        <button type="button" class="secondary-button" id="question-prev" disabled>Previous</button>
+        <span id="question-page-info" aria-live="polite">Page 1</span>
+        <button type="button" class="secondary-button" id="question-next" disabled>Next</button>
+      </div>
       <p id="questions-message" class="form-message" role="status"></p>
 
       <div id="question-modal" class="admin-modal hidden">

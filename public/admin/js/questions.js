@@ -13,6 +13,10 @@ let questions = [];
 let languages = [];
 let exams = [];
 let topics = [];
+let page = 1, pages = 1, total = 0, requestVersion = 0, searchTimer;
+const pageSize = document.getElementById("question-page-size");
+const previousPage = document.getElementById("question-prev");
+const nextPage = document.getElementById("question-next");
 
 function escapeHTML(value) {
   return String(value ?? "").replace(/[&<>"']/g, char => ({
@@ -59,11 +63,17 @@ async function apiRequest(url, options = {}) {
 }
 
 async function loadQuestions() {
+  const version = ++requestVersion;
+  previousPage.disabled = nextPage.disabled = true;
   tableBody.innerHTML = '<tr><td colspan="8">Loading...</td></tr>';
   showMessage("");
 
   try {
-    const data = await apiRequest(API_URL);
+    const params = new URLSearchParams({ page, page_size: pageSize.value,
+      exam_id: examFilter.value, status: statusFilter.value, q: searchInput.value.trim() });
+    const data = await apiRequest(`${API_URL}?${params}`);
+    if (version !== requestVersion) return;
+    page = data.page; pages = data.pages; total = data.total;
 
     questions = data.questions || [];
     languages = data.languages || [];
@@ -73,6 +83,7 @@ async function loadQuestions() {
     populateExamFilter();
     renderQuestions();
   } catch (error) {
+    if (version !== requestVersion) return;
     tableBody.innerHTML =
       '<tr><td colspan="8">Unable to load questions.</td></tr>';
     showMessage(error.message, "error");
@@ -94,34 +105,11 @@ function populateExamFilter() {
 }
 
 function renderQuestions() {
-  const keyword = searchInput.value.trim().toLowerCase();
-  const selectedExam = examFilter.value;
-  const selectedStatus = statusFilter.value;
-
-  const filtered = questions.filter(question => {
-    if (selectedExam &&
-      String(question.exam_id) !== selectedExam) return false;
-
-    if (selectedStatus && question.status !== selectedStatus) return false;
-
-    const translationText = Object.values(question.translations || {})
-      .map(item => `${item.question_text || ""} ${item.explanation || ""}`)
-      .join(" ");
-
-    const searchable = [
-      question.id,
-      question.exam_title,
-      question.exam_slug,
-      question.topic_name,
-      question.topic_slug,
-      translationText
-    ].join(" ").toLowerCase();
-
-    return searchable.includes(keyword);
-  });
-
-  document.getElementById("question-count").textContent =
-    `${filtered.length} questions`;
+  const filtered = questions;
+  document.getElementById("question-count").textContent = `${total} questions`;
+  document.getElementById("question-page-info").textContent = `Page ${page} of ${pages}`;
+  previousPage.disabled = page <= 1;
+  nextPage.disabled = page >= pages;
 
   if (!filtered.length) {
     tableBody.innerHTML =
@@ -130,9 +118,7 @@ function renderQuestions() {
   }
 
   tableBody.innerHTML = filtered.map(question => {
-    const english = question.translations?.en?.question_text;
-    const firstTranslation = Object.values(question.translations || {})[0];
-    const questionText = english || firstTranslation?.question_text || "(No text)";
+    const questionText = question.question_text || "(No text)";
 
     return `
       <tr>
@@ -517,7 +503,7 @@ async function deleteQuestion(id) {
   const question = questions.find(item => item.id === Number(id));
   if (!question) return;
 
-  const title = question.translations?.en?.question_text || `Question #${id}`;
+  const title = question.question_text || `Question #${id}`;
 
   if (!confirm(`Delete this question?\n\n${title}`)) return;
 
@@ -616,20 +602,33 @@ document.getElementById("question-images")
     if (button) button.closest(".question-image").remove();
   });
 
-examFilter.addEventListener("change", renderQuestions);
-statusFilter.addEventListener("change", renderQuestions);
-searchInput.addEventListener("input", renderQuestions);
+function resetPage() { clearTimeout(searchTimer); page = 1; loadQuestions(); }
+examFilter.addEventListener("change", resetPage);
+statusFilter.addEventListener("change", resetPage);
+pageSize.addEventListener("change", resetPage);
+searchInput.addEventListener("input", () => {
+  clearTimeout(searchTimer);
+  ++requestVersion;
+  previousPage.disabled = nextPage.disabled = true;
+  searchTimer = setTimeout(resetPage, 350);
+});
+previousPage.addEventListener("click", () => { if (page > 1) { page--; loadQuestions(); } });
+nextPage.addEventListener("click", () => { if (page < pages) { page++; loadQuestions(); } });
 form.addEventListener("submit", saveQuestion);
 
-tableBody.addEventListener("click", event => {
+tableBody.addEventListener("click", async event => {
   const button = event.target.closest("button[data-action]");
   if (!button) return;
 
   const { action, id } = button.dataset;
 
   if (action === "edit") {
-    const question = questions.find(item => item.id === Number(id));
-    if (question) openModal(question);
+    button.disabled = true;
+    try {
+      const data = await apiRequest(`${API_URL}/${id}`);
+      if (button.isConnected) openModal(data.question);
+    } catch (error) { showMessage(error.message, "error"); }
+    finally { button.disabled = false; }
   }
 
   if (action === "delete") deleteQuestion(id);
