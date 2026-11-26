@@ -428,7 +428,7 @@ async function listExams(env) {
     countriesResult,
     regionsResult,
     categoriesResult,
-    languageData
+    configuredLanguages
   ] = await Promise.all([
     env.DB.prepare(`
       SELECT
@@ -486,7 +486,7 @@ async function listExams(env) {
       FROM exam_categories
       ORDER BY name
     `).all(),
-    getExamLanguageData(env)
+    env.DB.prepare(`SELECT exam_id, language_code, is_enabled FROM exam_languages`).all()
   ]);
 
   const translationMap = {};
@@ -502,11 +502,14 @@ async function listExams(env) {
     };
   }
 
+  const configuredByExam = {};
+  for (const row of configuredLanguages.results || []) {
+    (configuredByExam[row.exam_id] ||= {})[row.language_code] = { is_enabled: Number(row.is_enabled) };
+  }
   const exams = (examResult.results || []).map(exam => ({
     ...exam,
     translations: translationMap[exam.id] || {},
-    supported_languages: languageData.byExam[exam.id] || {},
-    language_coverage: languageData.byCoverage[exam.id] || {}
+    supported_languages: configuredByExam[exam.id] || {}
   }));
 
   return jsonResponse({
@@ -1101,6 +1104,18 @@ export async function handleAdminExams(request, env) {
     return jsonResponse({ error: "Method not allowed." }, 405);
   }
 
+  const coverageMatch = url.pathname.match(/^\/api\/admin\/exams\/(\d+)\/language-coverage$/);
+  if (coverageMatch) {
+    if (method !== 'GET') return jsonResponse({error:'Method not allowed.'},405);
+    const id = Number(coverageMatch[1]);
+    const exists = await env.DB.prepare('SELECT id FROM exams WHERE id=?').bind(id).first();
+    if (!exists) return jsonResponse({error:'Exam not found.'},404);
+    const [data, titles] = await Promise.all([
+      getExamLanguageData(env,id),
+      env.DB.prepare('SELECT language_code,title,description FROM exam_translations WHERE exam_id=?').bind(id).all()
+    ]);
+    return jsonResponse({supported_languages:data.byExam[id] || {},language_coverage:data.byCoverage[id] || {},translations:Object.fromEntries((titles.results || []).map(row=>[row.language_code,{title:row.title,description:row.description}]))});
+  }
   const resourceMatch = url.pathname.match(/^\/api\/admin\/exams\/(\d+)\/resources(?:\/(\d+))?$/);
   if(resourceMatch) return resourceAdmin(request,env,Number(resourceMatch[1]),Number(resourceMatch[2])||null,jsonResponse);
   const queueMatch = url.pathname.match(/^\/api\/admin\/exams\/(\d+)\/review-queue$/);

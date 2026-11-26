@@ -226,7 +226,7 @@ function renderSupportedLanguages(exam = null) {
     const selected = exam ? Boolean(existing) : code === defaultCode;
     const enabled = Boolean(existing?.is_enabled);
     const stats = coverage[code];
-    const counts = stats ? `Questions ${stats.question_ready}/${stats.question_total}, options ${stats.option_ready}/${stats.option_total}, topics ${stats.topic_ready}/${stats.topic_total}, title ${stats.title_ready ? 'yes' : 'no'}` : 'No existing coverage';
+    const counts = stats ? `Questions ${stats.question_ready}/${stats.question_total}, options ${stats.option_ready}/${stats.option_total}, topics ${stats.topic_ready}/${stats.topic_total}, title ${stats.title_ready ? 'yes' : 'no'}` : exam ? 'Coverage unavailable' : 'No existing coverage';
     const ready = stats && Number(stats.title_ready) === 1 && Number(stats.question_total) > 0 &&
       Number(stats.question_ready) === Number(stats.question_total) &&
       Number(stats.option_ready) === Number(stats.option_total) &&
@@ -236,7 +236,7 @@ function renderSupportedLanguages(exam = null) {
         ${escapeHTML(language.native_name || language.name)} (${escapeHTML(code)})</label>
       <label style="margin-left:16px"><input type="checkbox" data-enabled-language="${escapeHTML(code)}" ${enabled ? 'checked' : ''} ${!selected ? 'disabled' : ''}>
         Enabled (public)</label>
-      <small style="display:block">${escapeHTML(counts)} — ${ready ? 'Ready' : 'Preparing / incomplete'}</small>
+      <small data-coverage-language="${escapeHTML(code)}" style="display:block">${escapeHTML(counts)} — ${ready ? 'Ready' : 'Preparing / incomplete'}</small>
       ${exam && selected && !enabled && code !== 'en' ? `<button type="button" data-translate-language="${escapeHTML(code)}" data-exam-id="${Number(exam.id)}" style="margin-top:6px">Translate missing (5 questions)</button>` : ''}
       ${exam && selected && !enabled && code !== 'en' ? `<button type="button" data-translate-metadata="${escapeHTML(code)}" data-exam-id="${Number(exam.id)}" style="margin-top:6px;margin-left:8px">Translate missing title / topics</button>` : ''}
       ${exam && selected && !enabled && code !== 'en' ? `<button type="button" data-review-language="${escapeHTML(code)}" data-exam-id="${Number(exam.id)}" style="margin-top:6px;margin-left:8px">Review translations</button>` : ''}
@@ -244,7 +244,34 @@ function renderSupportedLanguages(exam = null) {
   }).join('');
 }
 
+function refreshCoverageLabels(exam) {
+  for (const label of document.querySelectorAll('[data-coverage-language]')) {
+    const stats = exam.language_coverage?.[label.dataset.coverageLanguage];
+    if (!stats) continue;
+    const ready = Number(stats.title_ready) === 1 && Number(stats.question_total) > 0 &&
+      Number(stats.question_ready) === Number(stats.question_total) &&
+      Number(stats.option_ready) === Number(stats.option_total) && Number(stats.topic_ready) === Number(stats.topic_total);
+    label.textContent = `Questions ${stats.question_ready}/${stats.question_total}, options ${stats.option_ready}/${stats.option_total}, topics ${stats.topic_ready}/${stats.topic_total}, title ${stats.title_ready ? 'yes' : 'no'} — ${ready ? 'Ready' : 'Preparing / incomplete'}`;
+  }
+}
+
+let editRequest = 0;
+async function openExistingExam(exam, button) {
+  const token = ++editRequest;
+  button.disabled = true;
+  try {
+    const detail = await apiRequest(`${API_URL}/${exam.id}/language-coverage`);
+    if (token === editRequest) openModal({...exam,...detail});
+  } catch (error) {
+    if (token === editRequest) showMessage(error.message,'error');
+  } finally { button.disabled = false; }
+}
+
 function openModal(exam = null) {
+  ++editRequest;
+  reviewContext = null;
+  const reviewPanel = document.getElementById('exam-review-panel');
+  if (reviewPanel) reviewPanel.hidden = true;
   form.reset();
   showFormMessage("");
 
@@ -296,6 +323,10 @@ function openModal(exam = null) {
 }
 
 function closeModal() {
+  ++editRequest;
+  reviewContext = null;
+  const reviewPanel = document.getElementById('exam-review-panel');
+  if (reviewPanel) reviewPanel.hidden = true;
   modal.classList.add("hidden");
   form.reset();
   showFormMessage("");
@@ -426,7 +457,7 @@ tableBody.addEventListener("click", (event) => {
 
   if (action === "edit") {
     const exam = exams.find((item) => item.id === Number(id));
-    if (exam) openModal(exam);
+    if (exam) openExistingExam(exam, button);
   }
 
   if (action === "delete") {
@@ -451,14 +482,13 @@ document.getElementById('exam-supported-languages').addEventListener('click', as
     });
     showFormMessage(`Translated ${result.translated_texts} texts across ${result.processed_questions} questions. Review before enabling.`, 'success');
     // Refresh coverage, but keep the edit dialog and unsaved form fields in place.
-    const latest = await apiRequest(API_URL);
-    exams = latest.exams || [];
-    const updated = exams.find(exam => Number(exam.id) === examId);
-    if (updated) renderSupportedLanguages(updated);
+    const updated = await apiRequest(`${API_URL}/${examId}/language-coverage`);
+    updated.id = examId;
+    if (Number(document.getElementById('exam-id').value) !== examId || modal.classList.contains('hidden')) return;
+    if (updated) refreshCoverageLabels(updated);
   } catch (error) {
     showFormMessage(error.message, 'error');
-    button.disabled = false;
-  }
+  } finally { button.disabled = false; }
 });
 
 // Explicit metadata translation; only refresh blank title input to preserve unsaved edits.
@@ -474,19 +504,18 @@ document.getElementById('exam-supported-languages').addEventListener('click', as
     const result = await apiRequest(`${API_URL}/${examId}/translate-metadata`, {
       method: 'POST', body: JSON.stringify({ language_code: languageCode })
     });
-    const latest = await apiRequest(API_URL);
-    exams = latest.exams || [];
-    const updated = exams.find(exam => Number(exam.id) === examId);
+    const updated = await apiRequest(`${API_URL}/${examId}/language-coverage`);
+    updated.id = examId;
+    if (Number(document.getElementById('exam-id').value) !== examId || modal.classList.contains('hidden')) return;
     if (updated) {
       const input = document.getElementById(`translation-title-${languageCode}`);
       if (input && !input.value.trim()) input.value = updated.translations?.[languageCode]?.title || '';
-      renderSupportedLanguages(updated);
+      refreshCoverageLabels(updated);
     }
     showFormMessage(`Title translated: ${result.translated_title ? 'yes' : 'no'}; topics translated: ${result.translated_topics}. Review before enabling.`, 'success');
   } catch (error) {
     showFormMessage(error.message, 'error');
-    button.disabled = false;
-  }
+  } finally { button.disabled = false; }
 });
 
 // Review queue is rendered in the edit modal, without navigating away from unsaved form fields.
