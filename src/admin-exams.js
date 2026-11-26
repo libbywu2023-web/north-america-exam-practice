@@ -150,12 +150,12 @@ async function reviewStatus(env, examId, language) {
       WHERE et.exam_id = ? AND et.language_code = ? AND TRIM(et.title) <> ''
       UNION ALL
       SELECT 'topic', CASE WHEN r.reviewed_text = tt.name THEN 1 ELSE 0 END
-      FROM topics t JOIN questions q ON q.topic_id = t.id AND q.status = 'published'
+      FROM topics t
       JOIN topic_translations tt ON tt.topic_id = t.id AND tt.language_code = ?
       LEFT JOIN translation_reviews r ON r.exam_id = t.exam_id AND r.language_code = tt.language_code
         AND r.entity_type = 'topic' AND r.entity_id = t.id
       WHERE t.exam_id = ? AND TRIM(tt.name) <> ''
-      GROUP BY t.id
+        AND EXISTS (SELECT 1 FROM questions q WHERE q.topic_id = t.id AND q.status = 'published')
       UNION ALL
       SELECT 'question', CASE WHEN r.reviewed_text = qt.question_text THEN 1 ELSE 0 END
       FROM questions q JOIN question_translations qt ON qt.question_id = q.id AND qt.language_code = ?
@@ -257,13 +257,10 @@ async function handleReviewAll(id, request, env) {
   if (!config || Number(config.is_enabled)===1) {
     return jsonResponse({error:'Bulk review requires a configured, non-public language.'},409);
   }
-  const before = await reviewStatus(env,id,language);
-  const pending = Object.values(before).reduce((n,v)=>n+v.total-v.reviewed,0);
-  if (pending===0) return jsonResponse({success:true,approved:0,summary:before});
 
   // Capture current text from the same published content scope as reviewStatus.
   // One atomic INSERT...SELECT prevents partial approval and skips already-approved rows.
-  await env.DB.prepare(`
+  const write = await env.DB.prepare(`
     INSERT INTO translation_reviews (exam_id,language_code,entity_type,entity_id,reviewed_text)
     SELECT ?, ?, x.entity_type, x.entity_id, x.translated_text
     FROM (
@@ -292,7 +289,7 @@ async function handleReviewAll(id, request, env) {
   `).bind(id,language,id,language,language,id,language,id,language,id,id,language).run();
   const after = await reviewStatus(env,id,language);
   const remaining = Object.values(after).reduce((n,v)=>n+v.total-v.reviewed,0);
-  return jsonResponse({success:true,approved:pending-remaining,remaining,summary:after});
+  return jsonResponse({success:true,approved:Number(write.meta.changes || 0),remaining,summary:after});
 }
 
 function validateSlug(slug) {

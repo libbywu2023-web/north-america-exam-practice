@@ -523,11 +523,13 @@ let reviewPage = 1;
 let reviewContext = null;
 async function loadReviewQueue() {
   if (!reviewContext) return;
-  const {examId, languageCode} = reviewContext;
+  const context = reviewContext;
+  const {examId, languageCode} = context;
   const panel = document.getElementById('exam-review-panel');
   panel.textContent = 'Loading review items...';
   try {
     const data = await apiRequest(`${API_URL}/${examId}/review-queue?language_code=${encodeURIComponent(languageCode)}&page=${reviewPage}`);
+    if (reviewContext !== context) return;
     const summary = data.summary || {};
     const totals = Object.values(summary).reduce((a,v)=>({total:a.total+Number(v.total||0),reviewed:a.reviewed+Number(v.reviewed||0)}),{total:0,reviewed:0});
     panel.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><strong>Review ${escapeHTML(languageCode)} — ${totals.reviewed}/${totals.total} approved</strong><button type="button" data-review-close>Close</button></div>
@@ -553,7 +555,7 @@ async function loadReviewQueue() {
       });
       list.appendChild(div);
     }
-  } catch(error) {panel.textContent=error.message;}
+  } catch(error) {if (reviewContext === context) panel.textContent=error.message;}
 }
 document.getElementById('exam-supported-languages').addEventListener('click',event=>{
   const button=event.target.closest('[data-review-language]');
@@ -573,13 +575,18 @@ document.getElementById('exam-supported-languages').addEventListener('click',eve
 document.addEventListener('click',async event=>{
   if(event.target.closest('[data-review-all]')) {
     if (!reviewContext) return;
-    const {examId,languageCode}=reviewContext;
+    const context=reviewContext;
+    const {examId,languageCode}=context;
     if (!window.confirm(`Approve ALL existing translations for ${languageCode} in this exam, across every page? Only proceed after reviewing their contents. Missing translations will not be approved or created.`)) return;
     const btn=event.target.closest('[data-review-all]');
     btn.disabled=true;
     try {
       const result=await apiRequest(`${API_URL}/${examId}/review-all`,{method:'POST',body:JSON.stringify({language_code:languageCode,confirm_all:true})});
-      await loadReviewQueue();
+      if (reviewContext !== context) return;
+      // The bulk endpoint already returns a fresh summary. Close the queue rather
+      // than immediately repeating its full count and summary queries.
+      document.getElementById('exam-review-panel').hidden=true;
+      reviewContext=null;
       showFormMessage(`Bulk review approved ${result.approved} translations. Missing translations remain pending.`, 'success');
     } catch(err) {
       btn.disabled=false;
