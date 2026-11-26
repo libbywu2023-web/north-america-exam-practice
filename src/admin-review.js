@@ -21,20 +21,25 @@ function json(data, status = 200) {
 // A language is required only when non-empty content was supplied for it.
 async function suppliedLanguages(db, id, enabled) {
   const result = await db.prepare(`
-    SELECT language_code FROM question_translations_staging
-    WHERE staging_question_id = ? AND (TRIM(question_text) <> '' OR TRIM(COALESCE(explanation, '')) <> '')
-    UNION
-    SELECT ot.language_code FROM option_translations_staging ot
-    JOIN question_options_staging qo ON qo.id = ot.staging_option_id
-    WHERE qo.staging_question_id = ? AND TRIM(ot.option_text) <> ''
-  `).bind(id, id).all();
-  const supplied = new Set((result.results || []).map(row => row.language_code));
-  const scope = await db.prepare(`SELECT el.language_code FROM exam_languages el
+    SELECT el.language_code
+    FROM exam_languages el
     JOIN import_batches ib ON ib.exam_id = el.exam_id
     JOIN questions_staging qs ON qs.batch_id = ib.id
-    WHERE qs.id = ?`).bind(id).all();
-  const allowed = new Set((scope.results || []).map(row => row.language_code));
-  return enabled.filter(code => allowed.has(code) && (code === 'en' || supplied.has(code)));
+    WHERE qs.id = ? AND (
+      el.language_code = 'en' OR EXISTS (
+        SELECT 1 FROM question_translations_staging qt
+        WHERE qt.staging_question_id = qs.id AND qt.language_code = el.language_code
+          AND (TRIM(qt.question_text) <> '' OR TRIM(COALESCE(qt.explanation, '')) <> '')
+      ) OR EXISTS (
+        SELECT 1 FROM question_options_staging qo
+        JOIN option_translations_staging ot ON ot.staging_option_id = qo.id
+        WHERE qo.staging_question_id = qs.id AND ot.language_code = el.language_code
+          AND TRIM(ot.option_text) <> ''
+      )
+    )
+  `).bind(id).all();
+  const allowed = new Set((result.results || []).map(row => row.language_code));
+  return enabled.filter(code => allowed.has(code));
 }
 
 async function listReviewQuestions(request, env) {
@@ -636,14 +641,14 @@ async function bulkReviewQuestions(request, env) {
     return json({ error: "Invalid question IDs." }, 400);
   }
 
-  const placeholders = uniqueIds.map(() => "?").join(", ");
+  const idsJson = JSON.stringify(uniqueIds);
 
   try {
     const questionsResult = await env.DB.prepare(`
       SELECT id, status, has_image
       FROM questions_staging
-      WHERE id IN (${placeholders})
-    `).bind(...uniqueIds).all();
+      WHERE id IN (SELECT value FROM json_each(?))
+    `).bind(idsJson).all();
 
     const questions = questionsResult.results || [];
     const questionMap = new Map(questions.map(q => [q.id, q]));
@@ -735,7 +740,11 @@ async function bulkReviewQuestions(request, env) {
               SELECT COUNT(*)
               FROM staging_question_images
               WHERE staging_question_id = ?
-            ) AS image_count
+             ) AS image_count,
+            (SELECT COUNT(DISTINCT option_key) FROM question_options_staging WHERE staging_question_id = ?1) AS unique_keys,
+            (SELECT COUNT(DISTINCT sort_order) FROM question_options_staging WHERE staging_question_id = ?1) AS unique_orders,
+            (SELECT COUNT(*) FROM question_options_staging WHERE staging_question_id = ?1 AND option_key NOT IN ('A','B','C','D','E','F','G','H')) AS invalid_keys,
+            (SELECT COUNT(*) FROM question_options_staging WHERE staging_question_id = ?1 AND (typeof(sort_order) <> 'integer' OR sort_order < 1)) AS invalid_orders
         `).bind(
           id, ...languages,
           id,
@@ -743,27 +752,6 @@ async function bulkReviewQuestions(request, env) {
           id, ...languages, languages.length,
           id
         ).first();
-
-                const optionStructure = await env.DB.prepare(`
-          SELECT
-            COUNT(*) AS total,
-            COUNT(DISTINCT option_key) AS unique_keys,
-            COUNT(DISTINCT sort_order) AS unique_orders,
-            SUM(
-              CASE
-                WHEN option_key NOT IN ('A', 'B', 'C', 'D', 'E', 'F', 'G', 'H')
-                THEN 1 ELSE 0
-              END
-            ) AS invalid_keys,
-            SUM(
-              CASE
-                WHEN typeof(sort_order) <> 'integer' OR sort_order < 1
-                THEN 1 ELSE 0
-              END
-            ) AS invalid_orders
-          FROM question_options_staging
-          WHERE staging_question_id = ?
-        `).bind(id).first();
 
         const reasons = [];
 
@@ -779,15 +767,15 @@ async function bulkReviewQuestions(request, env) {
           reasons.push("Question must have exactly one correct option.");
         }
                 if (
-          optionStructure.invalid_keys > 0 ||
-          optionStructure.unique_keys !== optionStructure.total
+          validation.invalid_keys > 0 ||
+          validation.unique_keys !== validation.option_count
         ) {
           reasons.push("Option keys must be unique letters A-H.");
         }
 
         if (
-          optionStructure.invalid_orders > 0 ||
-          optionStructure.unique_orders !== optionStructure.total
+          validation.invalid_orders > 0 ||
+          validation.unique_orders !== validation.option_count
         ) {
           reasons.push("Option sort orders must be unique positive integers.");
         }
@@ -885,8 +873,6 @@ async function bulkPublishQuestions(request, env) {
   if (uniqueIds.some(id => !Number.isInteger(id) || id <= 0)) {
     return json({ error: "Invalid question IDs." }, 400);
   }
-
-  const placeholders = uniqueIds.map(() => "?").join(", ");
 
   try {
     const languagesResult = await env.DB.prepare(`
@@ -1309,6 +1295,7 @@ async function bulkPublishQuestions(request, env) {
           WHERE id = ?
             AND status = 'approved'
             AND published_question_id IS NULL
+          RETURNING published_question_id
         `).bind(stagingId));
 
         statements.push(env.DB.prepare(`
@@ -1338,14 +1325,8 @@ async function bulkPublishQuestions(request, env) {
             AND qs.status = 'published'
         `).bind(stagingId));
 
-        await env.DB.batch(statements);
-
-        const published = await env.DB.prepare(`
-          SELECT published_question_id
-          FROM questions_staging
-          WHERE id = ?
-            AND status = 'published'
-        `).bind(stagingId).first();
+        const publicationResults = await env.DB.batch(statements);
+        const published = publicationResults[5]?.results?.[0];
 
         if (!published?.published_question_id) {
           throw new Error("Publication did not complete.");
