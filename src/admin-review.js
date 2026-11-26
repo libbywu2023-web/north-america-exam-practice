@@ -71,11 +71,23 @@ async function listReviewQuestions(request, env) {
     values.push(status);
   }
 
-  const whereClause = conditions.length
-    ? `WHERE ${conditions.join(" AND ")}`
-    : "";
-
-  const result = await env.DB.prepare(`
+  const batch = url.searchParams.get("batch") || "";
+  if (batch) { conditions.push("qs.batch_id = ?"); values.push(batch); }
+  const baseWhere = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+  const image = url.searchParams.get("image") || "";
+  const translation = url.searchParams.get("translation") || "";
+  const filters = [];
+  if (image === "no_image") filters.push("image_count = 0 AND has_image <> 1");
+  if (image === "has_image") filters.push("image_count > 0");
+  if (image === "waiting_for_image") filters.push("status = 'waiting_for_image'");
+  if (translation === "all_manual") filters.push("translation_all_manual = 1");
+  if (translation === "contains_machine") filters.push("translation_complete = 1 AND translation_has_machine = 1");
+  if (translation === "incomplete") filters.push("translation_complete = 0");
+  const outerWhere = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
+  const size = [25,50,100].includes(Number(url.searchParams.get("size"))) ? Number(url.searchParams.get("size")) : 50;
+  const page = Math.max(1, Math.min(1000000, Math.floor(Number(url.searchParams.get("page")) || 1)));
+  const idsOnly = url.searchParams.get("ids") === "1";
+  const summary = `
     SELECT
       qs.id,
       qs.external_question_id,
@@ -194,14 +206,23 @@ async function listReviewQuestions(request, env) {
     LEFT JOIN question_translations_staging qt
       ON qt.staging_question_id = qs.id
       AND qt.language_code = 'en'
-    ${whereClause}
-    ORDER BY qs.created_at DESC, qs.id DESC
-    LIMIT 500
-  `).bind(...values).all();
+    ${baseWhere}
+  `;
+  const filtered = `FROM (${summary}) ${outerWhere}`;
+  if (idsOnly) {
+    const result = await env.DB.prepare(`SELECT id ${filtered} ORDER BY created_at DESC, id DESC LIMIT 501`).bind(...values).all();
+    const ids = result.results || [];
+    return json({ ids: ids.slice(0,500).map(row => row.id), truncated: ids.length > 500 });
+  }
+  const count = await env.DB.prepare(`SELECT COUNT(*) AS total ${filtered}`).bind(...values).first();
+  const total = Number(count?.total || 0);
+  const actualPage = Math.min(page, Math.max(1, Math.ceil(total / size)));
+  const result = await env.DB.prepare(`SELECT * ${filtered} ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`).bind(...values,size,(actualPage-1)*size).all();
+  const batches = await env.DB.prepare(`SELECT ib.id, ib.source_filename, e.slug AS exam_slug FROM import_batches ib JOIN exams e ON e.id = ib.exam_id ${examSlug ? "WHERE e.slug = ?" : ""} ORDER BY ib.id DESC`).bind(...(examSlug ? [examSlug] : [])).all();
 
   return json({
     exams: examsResult.results || [],
-    questions: result.results || []
+    questions: result.results || [], total, page: actualPage, size, batches: batches.results || []
   });
 }
 

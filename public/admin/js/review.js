@@ -14,7 +14,7 @@
     languages: [],
     saving: false,
     selectedIds: new Set(),
-    listRequestId: 0
+    listRequestId: 0, page: 1, size: 50, total: 0
   };
 
   const languageNames = {
@@ -88,50 +88,11 @@
   }
 
   function renderList() {
-    const examFilter = $("review-exam-filter").value;
-    const statusFilter = $("review-status-filter").value;
-    const imageFilter = $("review-image-filter").value;
-    const translationFilter = $("review-translation-filter").value;
-
-    const filtered = state.questions.filter(question => {
-      if (examFilter && question.exam_slug !== examFilter) return false;
-      if (statusFilter && question.status !== statusFilter) return false;
-
-      const imageCount = getImageCount(question);
-
-      if (imageFilter === "no_image" &&
-          (imageCount > 0 || Number(question.has_image) === 1)) return false;
-
-      if (imageFilter === "has_image" && imageCount === 0) return false;
-
-      if (imageFilter === "waiting_for_image" &&
-          question.status !== "waiting_for_image") return false;
-
-      const translationComplete =
-        Number(question.translation_complete) === 1;
-      const translationHasMachine =
-        Number(question.translation_has_machine) === 1;
-      const translationAllManual =
-        Number(question.translation_all_manual) === 1;
-
-      if (translationFilter === "all_manual" && !translationAllManual) {
-        return false;
-      }
-
-      if (translationFilter === "contains_machine" &&
-          (!translationComplete || !translationHasMachine)) {
-        return false;
-      }
-
-      if (translationFilter === "incomplete" && translationComplete) {
-        return false;
-      }
-
-      return true;
-    });
-
-    $("review-question-count").textContent =
-      `${filtered.length} question${filtered.length === 1 ? "" : "s"}`;
+    const filtered = state.questions;
+    $("review-question-count").textContent = `${state.total} questions`;
+    $("review-page-label").textContent = `Page ${state.page} / ${Math.max(1, Math.ceil(state.total / state.size))}`;
+    $("review-prev").disabled = state.page <= 1;
+    $("review-next").disabled = state.page * state.size >= state.total;
 
     if (!filtered.length) {
       $("review-table-body").innerHTML = `
@@ -202,15 +163,22 @@
     $("bulk-publish-button").disabled = state.selectedIds.size === 0;
   }
 
-  async function loadList() {
+  function listParams() {
+    const params = new URLSearchParams({page: state.page, size: state.size});
+    for (const key of ["exam", "status", "image", "translation", "batch"]) {
+      const value = $(`review-${key}-filter`).value;
+      if (value) params.set(key, value);
+    }
+    return params;
+  }
+
+  async function loadList(preserveSelection = false) {
     const requestId = ++state.listRequestId;
     const selectedExam = $("review-exam-filter").value;
-    const selectedStatus = $("review-status-filter").value;
-    const params = new URLSearchParams();
-    if (selectedExam) params.set("exam", selectedExam);
-    if (selectedStatus) params.set("status", selectedStatus);
+    const selectedBatch = $("review-batch-filter").value;
+    const params = listParams();
     state.questions = [];
-    state.selectedIds.clear();
+    if (preserveSelection !== true) state.selectedIds.clear();
     updateSelectionUI();
     showMessage($("review-list-message"), "");
     $("review-table-body").innerHTML = `
@@ -220,6 +188,11 @@
       const data = await apiRequest(`${API_URL}?${params}`);
       if (requestId !== state.listRequestId) return;
       state.questions = data.questions || [];
+      state.total = data.total;
+      state.page = data.page;
+      $("review-batch-filter").innerHTML = '<option value="">All batches</option>' + (data.batches || []).map(b => `<option value="${Number(b.id)}">#${Number(b.id)} ${escapeHTML(b.source_filename)}</option>`).join("");
+      $("review-batch-filter").value = selectedBatch;
+      if (!$("review-batch-filter").value) $("review-batch-filter").value = "";
 
       const exams = data.exams || [];
 
@@ -706,7 +679,6 @@
       }
 
       await refreshCurrentQuestion();
-      await loadList();
 
       showMessage(
         $("review-save-message"),
@@ -728,6 +700,7 @@
     const ids = [...state.selectedIds];
 
     if (ids.length === 0) return;
+    if (ids.length > 500) { alert("Select at most 500 questions."); return; }
 
     const actionLabel = action === "approve" ? "approve" : "reject";
 
@@ -794,6 +767,7 @@
     const ids = [...state.selectedIds];
 
     if (ids.length === 0) return;
+    if (ids.length > 500) { alert("Select at most 500 questions."); return; }
 
     if (!confirm(
       `Are you sure you want to publish ${ids.length} selected question(s)? Only approved questions can be published.`
@@ -865,15 +839,23 @@
     });
 
     $("bulk-publish-button").addEventListener("click", bulkPublish);
-    const handleFilterChange = () => {
-      state.selectedIds.clear();
-      renderList();
-    };
-
-    $("review-exam-filter").addEventListener("change", loadList);
-    $("review-status-filter").addEventListener("change", loadList);
-    $("review-image-filter").addEventListener("change", handleFilterChange);
-    $("review-translation-filter").addEventListener("change", handleFilterChange);
+    const handleFilterChange = () => { state.page = 1; loadList(); };
+    $("review-exam-filter").addEventListener("change", () => { $("review-batch-filter").value = ""; handleFilterChange(); });
+    for (const key of ["status", "image", "translation", "batch"]) $( `review-${key}-filter`).addEventListener("change", handleFilterChange);
+    $("review-size").addEventListener("change", () => { state.size = Number($("review-size").value); state.page = 1; loadList(true); });
+    $("review-prev").addEventListener("click", () => { if (state.page > 1) { state.page--; loadList(true); } });
+    $("review-next").addEventListener("click", () => { if (state.page * state.size < state.total) { state.page++; loadList(true); } });
+    $("review-select-filtered").addEventListener("click", async () => {
+      const requestId = state.listRequestId;
+      const params = listParams(); params.set("ids", "1");
+      try {
+        const data = await apiRequest(`${API_URL}?${params}`);
+        if (requestId !== state.listRequestId) return;
+        if (data.truncated) { alert("More than 500 matching questions. Narrow your filters before selecting all."); return; }
+        state.selectedIds = new Set(data.ids.map(Number)); renderList();
+      } catch (error) { showMessage($("review-list-message"), error.message, "error"); }
+    });
+    $("review-clear-selection").addEventListener("click", () => { state.selectedIds.clear(); renderList(); });
 
     $("review-select-all").addEventListener("change", event => {
       document.querySelectorAll(".review-question-checkbox").forEach(checkbox => {

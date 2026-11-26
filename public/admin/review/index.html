@@ -420,6 +420,7 @@
             <option value="incomplete">Incomplete</option>
           </select>
         </div>
+        <div class="review-field"><label for="review-batch-filter">Import Batch</label><select id="review-batch-filter"><option value="">All batches</option></select></div>
         <button type="button" id="refresh-review-button" class="secondary-button">
           Refresh
         </button>
@@ -460,7 +461,7 @@
               <tr>
                 <th>
                   <input type="checkbox" id="review-select-all"
-                    aria-label="Select all filtered questions">
+                    aria-label="Select current page">
                 </th>
                 <th>ID</th>
                 <th>Question</th>
@@ -475,6 +476,14 @@
               <tr><td colspan="8" class="review-empty">Loading questions...</td></tr>
             </tbody>
           </table>
+        </div>
+        <div class="review-bulk-actions">
+          <button type="button" class="secondary-button" id="review-select-filtered">Select all matching (up to 500)</button>
+          <button type="button" class="secondary-button" id="review-clear-selection">Clear selection</button>
+          <button type="button" class="secondary-button" id="review-prev">Previous</button>
+          <span id="review-page-label"></span>
+          <button type="button" class="secondary-button" id="review-next">Next</button>
+          <label>Per page <select id="review-size"><option>25</option><option selected>50</option><option>100</option></select></label>
         </div>
         <p id="review-list-message" class="review-message" role="status"></p>
       </section>
