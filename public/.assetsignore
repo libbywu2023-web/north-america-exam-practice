@@ -1,0 +1,8 @@
+# Exclude temporary and historical backup files
+**/*.before*
+**/*.backup*
+**/*.bak*
+**/*.old*
+**/*.orig*
+**/*~
+**/.DS_Store
