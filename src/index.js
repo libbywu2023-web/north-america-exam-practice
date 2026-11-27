@@ -982,11 +982,12 @@ export default {
               alternates: SEO_LANGS.filter(() => exams.length).map(l => ({code:l.code,url:SEO_ORIGIN+seoPath(l.code,examSlug)}))});
             metadata.canonical = canonical;
             metadata.noindex = !exams.length;
-            const resourceRows = await env.DB.prepare(`SELECT er.*, e.slug FROM exam_resources er JOIN exams e ON e.id=er.exam_id WHERE er.is_published=1 AND e.status='published' ORDER BY er.sort_order,er.id`).all();
-            const candidates = (resourceRows.results || []).filter(r => exams.some(e=>e.slug===r.slug));
-            const localizedExams = new Set(candidates.filter(r => r.language_code === routeLang).map(r => r.slug));
-            const resources = candidates.filter(r => r.language_code === (localizedExams.has(r.slug) ? routeLang : "en"));
-            metadata.categoryBody = categoryBody(routeLang, examSlug, exams, seoPath, seoEscape, resources);
+            // Temporarily hide official study resources pending UI redesign.
+            // const resourceRows = await env.DB.prepare(`SELECT er.*, e.slug FROM exam_resources er JOIN exams e ON e.id=er.exam_id WHERE er.is_published=1 AND e.status='published' ORDER BY er.sort_order,er.id`).all();
+            // const candidates = (resourceRows.results || []).filter(r => exams.some(e=>e.slug===r.slug));
+            // const localizedExams = new Set(candidates.filter(r => r.language_code === routeLang).map(r => r.slug));
+            // const resources = candidates.filter(r => r.language_code === (localizedExams.has(r.slug) ? routeLang : "en"));
+            metadata.categoryBody = categoryBody(routeLang, examSlug, exams, seoPath, seoEscape, []);
             const assetUrl = new URL(request.url); assetUrl.pathname = '/';
             return seoHtmlResponse(await env.ASSETS.fetch(new Request(assetUrl, request)), metadata);
           }
