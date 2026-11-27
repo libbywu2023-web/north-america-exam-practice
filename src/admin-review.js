@@ -51,18 +51,6 @@ async function listReviewQuestions(request, env) {
     return json({ error: "Invalid review status." }, 400);
   }
 
-  const examsResult = await env.DB.prepare(`
-    SELECT
-      e.slug,
-      COALESCE(et.title, e.slug) AS title,
-      e.status AS exam_status
-    FROM exams e
-    LEFT JOIN exam_translations et
-      ON et.exam_id = e.id
-      AND et.language_code = 'en'
-    ORDER BY e.id DESC
-  `).all();
-
   const conditions = [];
   const values = [];
 
@@ -92,7 +80,11 @@ async function listReviewQuestions(request, env) {
   const size = [25,50,100].includes(Number(url.searchParams.get("size"))) ? Number(url.searchParams.get("size")) : 50;
   const page = Math.max(1, Math.min(1000000, Math.floor(Number(url.searchParams.get("page")) || 1)));
   const idsOnly = url.searchParams.get("ids") === "1";
-  const summary = `
+  const baseFrom = `FROM questions_staging qs
+    JOIN import_batches ib ON ib.id = qs.batch_id
+    JOIN exams e ON e.id = ib.exam_id`;
+  const base = `${baseFrom} ${baseWhere}`;
+  const summary = (where = baseWhere) => `
     SELECT
       qs.id,
       qs.external_question_id,
@@ -200,29 +192,45 @@ async function listReviewQuestions(request, env) {
             )
         )
       THEN 1 ELSE 0 END AS translation_all_manual
-    FROM questions_staging qs
-    JOIN import_batches ib
-      ON ib.id = qs.batch_id
-    JOIN exams e
-      ON e.id = ib.exam_id
+    ${baseFrom}
     LEFT JOIN exam_translations et
       ON et.exam_id = e.id
       AND et.language_code = 'en'
     LEFT JOIN question_translations_staging qt
       ON qt.staging_question_id = qs.id
       AND qt.language_code = 'en'
-    ${baseWhere}
+    ${where}
   `;
-  const filtered = `FROM (${summary}) ${outerWhere}`;
+  const filtered = filters.length ? `FROM (${summary()}) ${outerWhere}` : base;
   if (idsOnly) {
-    const result = await env.DB.prepare(`SELECT id ${filtered} ORDER BY created_at DESC, id DESC LIMIT 501`).bind(...values).all();
+    const result = await env.DB.prepare(`SELECT ${filters.length ? "id" : "qs.id"} ${filtered} ORDER BY ${filters.length ? "created_at DESC, id DESC" : "qs.created_at DESC, qs.id DESC"} LIMIT 501`).bind(...values).all();
     const ids = result.results || [];
     return json({ ids: ids.slice(0,500).map(row => row.id), truncated: ids.length > 500 });
   }
   const count = await env.DB.prepare(`SELECT COUNT(*) AS total ${filtered}`).bind(...values).first();
   const total = Number(count?.total || 0);
   const actualPage = Math.min(page, Math.max(1, Math.ceil(total / size)));
-  const result = await env.DB.prepare(`SELECT * ${filtered} ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`).bind(...values,size,(actualPage-1)*size).all();
+  // Compute expensive display fields only for page IDs unless a derived filter
+  // must be evaluated before pagination to preserve exact matching semantics.
+  const result = filters.length
+    ? await env.DB.prepare(`SELECT * ${filtered} ORDER BY created_at DESC, id DESC LIMIT ? OFFSET ?`).bind(...values,size,(actualPage-1)*size).all()
+    : await env.DB.prepare(`WITH page_ids AS MATERIALIZED (
+        SELECT qs.id ${base} ORDER BY qs.created_at DESC, qs.id DESC LIMIT ? OFFSET ?
+      ) ${summary("WHERE qs.id IN (SELECT id FROM page_ids)")} ORDER BY qs.created_at DESC, qs.id DESC`)
+      .bind(...values,size,(actualPage-1)*size).all();
+  const examsResult = await env.DB.prepare(`
+    SELECT
+      e.slug,
+      COALESCE(et.title, e.slug) AS title,
+      e.status AS exam_status
+    FROM exams e
+    LEFT JOIN exam_translations et
+      ON et.exam_id = e.id
+      AND et.language_code = 'en'
+    ORDER BY e.id DESC
+  `).all();
+
+
   const batches = await env.DB.prepare(`SELECT ib.id, ib.source_filename, e.slug AS exam_slug FROM import_batches ib JOIN exams e ON e.id = ib.exam_id ${examSlug ? "WHERE e.slug = ?" : ""} ORDER BY ib.id DESC`).bind(...(examSlug ? [examSlug] : [])).all();
 
   return json({

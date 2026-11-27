@@ -747,6 +747,11 @@
       alert(message);
 
       state.selectedIds.clear();
+      // Pending items disappear after approval; show approved items for publishing.
+      if (action === "approve" && data.succeeded > 0 && $("review-status-filter").value === "pending_review") {
+        $("review-status-filter").value = "approved";
+        state.page = 1;
+      }
       await loadList();
 
       showMessage(

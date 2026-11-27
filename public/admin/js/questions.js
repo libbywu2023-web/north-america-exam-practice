@@ -13,7 +13,7 @@ let questions = [];
 let languages = [];
 let exams = [];
 let topics = [];
-let page = 1, pages = 1, total = 0, requestVersion = 0, searchTimer;
+let page = 1, pages = 1, total = 0, requestVersion = 0, appliedSearch = "";
 const pageSize = document.getElementById("question-page-size");
 const previousPage = document.getElementById("question-prev");
 const nextPage = document.getElementById("question-next");
@@ -70,7 +70,7 @@ async function loadQuestions() {
 
   try {
     const params = new URLSearchParams({ page, page_size: pageSize.value,
-      exam_id: examFilter.value, status: statusFilter.value, q: searchInput.value.trim() });
+      exam_id: examFilter.value, status: statusFilter.value, q: appliedSearch });
     const data = await apiRequest(`${API_URL}?${params}`);
     if (version !== requestVersion) return;
     page = data.page; pages = data.pages; total = data.total;
@@ -602,15 +602,14 @@ document.getElementById("question-images")
     if (button) button.closest(".question-image").remove();
   });
 
-function resetPage() { clearTimeout(searchTimer); page = 1; loadQuestions(); }
+function resetPage() { page = 1; loadQuestions(); }
 examFilter.addEventListener("change", resetPage);
 statusFilter.addEventListener("change", resetPage);
 pageSize.addEventListener("change", resetPage);
-searchInput.addEventListener("input", () => {
-  clearTimeout(searchTimer);
-  ++requestVersion;
-  previousPage.disabled = nextPage.disabled = true;
-  searchTimer = setTimeout(resetPage, 350);
+function submitSearch() { appliedSearch = searchInput.value.trim(); resetPage(); }
+document.getElementById("question-search-button").addEventListener("click", submitSearch);
+searchInput.addEventListener("keydown", event => {
+  if (event.key === "Enter" && !event.isComposing) { event.preventDefault(); submitSearch(); }
 });
 previousPage.addEventListener("click", () => { if (page > 1) { page--; loadQuestions(); } });
 nextPage.addEventListener("click", () => { if (page < pages) { page++; loadQuestions(); } });

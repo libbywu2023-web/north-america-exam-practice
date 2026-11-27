@@ -540,18 +540,42 @@ async function listQuestions(env, url) {
     LEFT JOIN topics t ON t.id = q.topic_id
     LEFT JOIN topic_translations tt ON tt.topic_id = t.id AND tt.language_code = e.default_language`;
   const where = filters.length ? `WHERE ${filters.join(" AND ")}` : "";
-  const count = await env.DB.prepare(`SELECT COUNT(*) AS total ${from} ${where}`).bind(...args).first();
-  const total = Number(count.total);
-  const pages = Math.max(1, Math.ceil(total / pageSize));
-  const page = Math.min(pages, Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1);
-  const [result, languages, examsResult, topicsResult] = await Promise.all([
-    env.DB.prepare(`SELECT q.id, q.exam_id, q.topic_id, q.difficulty, q.status,
+  const wantedPage = Number.isSafeInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
+  const projection = `SELECT q.id, q.exam_id, q.topic_id, q.difficulty, q.status,
       e.slug AS exam_slug, COALESCE(et.title, e.slug) AS exam_title,
       t.slug AS topic_slug, COALESCE(tt.name, t.slug) AS topic_name,
       COALESCE(NULLIF((SELECT question_text FROM question_translations WHERE question_id = q.id AND language_code = 'en'), ''),
         (SELECT question_text FROM question_translations WHERE question_id = q.id ORDER BY language_code LIMIT 1), '') AS question_text,
       (SELECT COUNT(*) FROM question_images WHERE question_id = q.id) AS image_count
-      ${from} ${where} ORDER BY q.id DESC LIMIT ? OFFSET ?`).bind(...args, pageSize, (page - 1) * pageSize).all(),
+`;
+  let total, page, result;
+  if (keyword) {
+    // Materialize matching IDs once, then count and paginate the same set.
+    // LEFT JOIN retains the count even when no questions match.
+    result = await env.DB.prepare(`WITH matches AS MATERIALIZED (
+      SELECT q.id ${from} ${where}
+    ), totals AS (SELECT COUNT(*) AS total FROM matches),
+    page_ids AS MATERIALIZED (
+      SELECT id FROM matches ORDER BY id DESC LIMIT ? OFFSET (
+        SELECT (MIN(?, MAX(1, CAST((total + ? - 1) / ? AS INTEGER))) - 1) * ? FROM totals
+      )
+    ), page_rows AS (
+      ${projection} ${from} WHERE q.id IN (SELECT id FROM page_ids)
+    ) SELECT page_rows.*, totals.total AS match_total FROM totals
+      LEFT JOIN page_rows ON 1=1 ORDER BY page_rows.id DESC`)
+      .bind(...args, pageSize, wantedPage, pageSize, pageSize, pageSize).all();
+    total = Number(result.results?.[0]?.match_total || 0);
+    result.results = (result.results || []).filter(row => row.id != null).map(({match_total, ...row}) => row);
+    page = Math.min(wantedPage, Math.max(1, Math.ceil(total / pageSize)));
+  } else {
+    const count = await env.DB.prepare(`SELECT COUNT(*) AS total FROM questions q ${where}`).bind(...args).first();
+    total = Number(count.total);
+    page = Math.min(wantedPage, Math.max(1, Math.ceil(total / pageSize)));
+    result = await env.DB.prepare(`${projection} ${from} ${where} ORDER BY q.id DESC LIMIT ? OFFSET ?`)
+      .bind(...args, pageSize, (page - 1) * pageSize).all();
+  }
+  const pages = Math.max(1, Math.ceil(total / pageSize));
+  const [languages, examsResult, topicsResult] = await Promise.all([
     getEnabledLanguages(env),
     env.DB.prepare("SELECT id, slug FROM exams ORDER BY id DESC").all(),
     env.DB.prepare("SELECT id, exam_id, slug FROM topics ORDER BY exam_id, sort_order").all()
